@@ -1,0 +1,8 @@
+requests
+faiss-cpu
+sentence-transformers
+fastapi
+uvicorn
+jinja2
+markdown
+numpy

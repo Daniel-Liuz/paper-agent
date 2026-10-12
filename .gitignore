@@ -1,0 +1,7 @@
+# 密钥与本地产物一律不进 git
+.env
+__pycache__/
+data/
+outputs/
+*.index
+*.pkl

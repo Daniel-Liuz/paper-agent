@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>paper-agent · 论文获取与理解工作流</title>
+<style>
+  :root {
+    --fg:#111827; --muted:#6b7280; --faint:#9ca3af;
+    --line:#e8eaf0; --card:#ffffff; --bg:#f4f5f9;
+    --accent:#4f46e5; --accent-2:#7c3aed; --accent-soft:#eef2ff;
+    --green:#059669; --green-bg:#ecfdf5; --amber:#b45309; --amber-bg:#fffbeb;
+    --radius:14px;
+    --shadow:0 1px 2px rgba(17,24,39,.05), 0 4px 16px rgba(17,24,39,.05);
+    --shadow-lg:0 8px 30px rgba(79,70,229,.16);
+  }
+  * { box-sizing:border-box; margin:0; }
+  html { -webkit-font-smoothing:antialiased; }
+  body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    background:var(--bg); color:var(--fg); line-height:1.6;
+  }
+  a { color:inherit; }
+
+  /* ---------- Hero ---------- */
+  .hero {
+    background:linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#5b21b6 100%);
+    color:#fff; padding:44px 24px 96px;
+  }
+  .hero-inner { max-width:1000px; margin:0 auto; }
+  .brand { display:flex; align-items:center; gap:12px; }
+  .logo {
+    width:40px; height:40px; border-radius:11px; flex:none;
+    background:linear-gradient(135deg,#818cf8,#c084fc);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px; box-shadow:0 4px 14px rgba(129,140,248,.45);
+  }
+  .hero h1 { font-size:24px; font-weight:700; letter-spacing:.02em; }
+  .hero .tagline { color:#c7d2fe; font-size:13.5px; margin-top:2px; }
+  .pipeline {
+    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
+    margin-top:22px; font-size:13px; color:#e0e7ff;
+  }
+  .pipeline .stage {
+    background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16);
+    backdrop-filter:blur(6px); padding:5px 13px; border-radius:999px;
+  }
+  .pipeline .arrow { color:#818cf8; font-weight:700; }
+  .stats { display:flex; gap:14px; margin-top:26px; flex-wrap:wrap; }
+  .stat {
+    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
+    backdrop-filter:blur(8px); border-radius:12px; padding:12px 18px; min-width:120px;
+  }
+  .stat b { display:block; font-size:22px; font-weight:700; }
+  .stat span { font-size:12px; color:#c7d2fe; }
+
+  /* ---------- 布局 ---------- */
+  main { max-width:1000px; margin:-64px auto 0; padding:0 20px 40px; display:grid; gap:22px; }
+  section.card {
+    background:var(--card); border:1px solid var(--line);
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:24px 26px;
+  }
+  .sec-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
+  .sec-title {
+    font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--faint);
+  }
+  .sec-note { font-size:12.5px; color:var(--muted); }
+
+  /* ---------- 搜索 ---------- */
+  .search { display:flex; gap:10px; }
+  .search input {
+    flex:1; padding:13px 16px; font-size:15px; border:1.5px solid var(--line);
+    border-radius:11px; outline:none; transition:border .15s, box-shadow .15s; background:#fafafa;
+  }
+  .search input:focus { border-color:var(--accent); background:#fff; box-shadow:0 0 0 4px rgba(79,70,229,.10); }
+  .search button {
+    padding:13px 26px; border:0; border-radius:11px; cursor:pointer;
+    font-size:14.5px; font-weight:600; color:#fff;
+    background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    box-shadow:var(--shadow-lg); transition:transform .12s, filter .12s;
+  }
+  .search button:hover { transform:translateY(-1px); filter:brightness(1.06); }
+  .hint { color:var(--muted); font-size:13px; margin-top:10px; }
+
+  /* ---------- 论文条目 ---------- */
+  .paper {
+    padding:14px 2px; border-bottom:1px solid var(--line);
+    transition:background .12s; border-radius:8px;
+  }
+  .paper:hover { background:var(--accent-soft); }
+  .paper:last-child { border-bottom:0; }
+  .paper .t { font-weight:600; font-size:15px; }
+  .paper .t a { text-decoration:none; }
+  .paper .t a:hover { color:var(--accent); }
+  .paper .m { color:var(--muted); font-size:12.5px; margin-top:3px; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
+  .pill {
+    background:#f1f2f7; color:#4b5563; border-radius:5px; padding:1px 8px;
+    font-size:11.5px; white-space:nowrap;
+  }
+  .chip { border-radius:6px; padding:1px 8px; font-size:11.5px; font-weight:700; white-space:nowrap; }
+  .chip.s5,.chip.s4 { background:var(--green-bg); color:var(--green); }
+  .chip.s3 { background:var(--amber-bg); color:var(--amber); }
+  .chip.s0,.chip.s2 { background:#f1f2f7; color:#6b7280; }
+
+  /* ---------- 日报 ---------- */
+  .digest h1 { font-size:18px; margin-bottom:6px; }
+  .digest blockquote {
+    border-left:3px solid var(--accent); background:var(--accent-soft);
+    padding:8px 14px; border-radius:0 8px 8px 0; color:#4338ca; font-size:13px; margin:10px 0 4px;
+  }
+  .digest h2 {
+    font-size:15.5px; margin:20px 0 6px; padding-left:11px; border-left:3px solid var(--accent-2);
+  }
+  .digest h2 a { text-decoration:none; }
+  .digest h2 a:hover { color:var(--accent-2); }
+  .digest p { font-size:14px; margin:6px 0; }
+  .digest hr { border:0; border-top:1px dashed var(--line); margin:16px 0; }
+  .digest em { color:var(--faint); font-size:13px; }
+
+  /* ---------- 评测看板 & 安全攻防 ---------- */
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .metric { background:#fafbff; border:1px solid var(--line); border-radius:11px; padding:12px 14px; }
+  .metric b { display:block; font-size:20px; color:var(--accent); }
+  .metric span { font-size:12px; color:var(--muted); }
+  .metric small { display:block; color:var(--faint); font-size:11px; margin-top:2px; }
+  table.sec { border-collapse:collapse; width:100%; margin-top:6px; }
+  table.sec th, table.sec td {
+    border:1px solid var(--line); padding:8px 10px; font-size:13px; text-align:center;
+  }
+  table.sec th { background:#fafbff; color:var(--muted); font-weight:600; }
+  .asr-high { color:#dc2626; font-weight:700; }
+  .asr-mid  { color:var(--amber); font-weight:600; }
+  .asr-low  { color:var(--green); font-weight:700; }
+  .ext { color:var(--faint); font-size:12px; text-decoration:none; margin-left:6px; }
+  .ext:hover { color:var(--accent); }
+
+  footer { text-align:center; color:var(--faint); font-size:12.5px; padding:8px 20px 36px; }
+  footer b { color:var(--accent); }
+
+  @media (max-width:640px) {
+    .hero { padding:32px 18px 84px; }
+    .search { flex-direction:column; }
+    section.card { padding:18px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <div class="hero-inner">
+    <div class="brand">
+      <div class="logo">📄</div>
+      <div>
+        <h1>paper-agent</h1>
+        <div class="tagline">论文获取与理解 Agent 工作流 · 个人项目</div>
+      </div>
+    </div>
+    <div class="pipeline">
+      <span class="stage">多源抓取</span><span class="arrow">→</span>
+      <span class="stage">BGE-M3 / FAISS 入库</span><span class="arrow">→</span>
+      <span class="stage">语义检索</span><span class="arrow">→</span>
+      <span class="stage">agentic 日报</span><span class="arrow">→</span>
+      <span class="stage">评测 &amp; 注入攻防 v0.1</span>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>{{ indexed }}</b><span>向量索引库</span></div>
+      <div class="stat"><b>{{ fetched }}</b><span>今日抓取</span></div>
+      <div class="stat"><b>{{ digest.date if digest else '—' }}</b><span>最新日报</span></div>
+    </div>
+  </div>
+</div>
+
+<main>
+
+  <section class="card">
+    <div class="sec-head">
+      <div class="sec-title">语义检索</div>
+      <div class="sec-note">查询文本 → BGE-M3 向量 → FAISS 余弦 Top-K</div>
+    </div>
+    <form class="search" action="/search" method="get">
+      <input type="text" name="q" placeholder="试试：prompt injection 防御 / multi-agent 协作 / agent evaluation benchmark"
+             value="{{ query or '' }}">
+      <button type="submit">检索</button>
+    </form>
+    {% if query %}
+      <div class="hint">「{{ query }}」的 Top {{ results|length }} 结果：</div>
+      {% for r in results %}
+        <div class="paper">
+          <div class="t"><a href="{{ r.abs_url }}" target="_blank" rel="noopener">{{ r.title }}</a>
+            <span class="chip s{{ '5' if r.score|float >= 0.75 else '3' if r.score|float >= 0.5 else '2' }}">{{ r.score }}</span>
+          </div>
+          <div class="m">
+            <span>{{ r.published }}</span>
+            <span>{{ r.authors[:3]|join(', ') }}{% if r.authors|length > 3 %} et al.{% endif %}</span>
+            <span class="pill">{{ r.source }}</span>
+          </div>
+        </div>
+      {% else %}
+        <div class="hint">没有结果——索引可能还没建（跑 ingest.py），或换个说法试试。</div>
+      {% endfor %}
+    {% endif %}
+  </section>
+
+  {% if digest %}
+  <section class="card digest">
+    <div class="sec-head">
+      <div class="sec-title">最新日报 · agentic 生成</div>
+      <div class="sec-note">关键词初筛 → LLM 相关性打分与摘要</div>
+    </div>
+    {{ digest.html | safe }}
+  </section>
+  {% endif %}
+
+  {% if eval_data %}
+  <section class="card">
+    <div class="sec-head">
+      <div class="sec-title">评测看板</div>
+      <div class="sec-note">更新于 {{ eval_data.date }} · 索引 {{ eval_data.n_index }} 篇</div>
+    </div>
+    <div class="metrics">
+      <div class="metric"><b>{{ "%.2f"|format(eval_data.retrieval.mrr) }}</b><span>检索 MRR</span>
+        <small>自检索协议，n={{ eval_data.retrieval.n }}</small></div>
+      <div class="metric"><b>{{ "%.0f%%"|format(eval_data.retrieval.hit5 * 100) }}</b><span>Hit@5</span>
+        <small>标题查询能否找回原文</small></div>
+      <div class="metric"><b>{{ "%.0f%%"|format(eval_data.retrieval.hit1 * 100) }}</b><span>Hit@1</span></div>
+      {% if eval_data.faithfulness.mean %}
+      <div class="metric"><b>{{ eval_data.faithfulness.mean }}/5</b><span>摘要忠实度</span>
+        <small>LLM-as-judge，n={{ eval_data.faithfulness.n }}，均延迟 {{ eval_data.faithfulness.judge_latency_ms }}ms</small></div>
+      {% endif %}
+    </div>
+    {% if eval_data.faithfulness.flagged %}
+    <div class="hint" style="margin-top:10px;">⚠ 被标记的疑似不支持陈述：</div>
+    {% for f in eval_data.faithfulness.flagged %}
+      <div class="hint">· {{ f.title }} →「{{ f.unsupported }}」</div>
+    {% endfor %}
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% if sec_data %}
+  <section class="card">
+    <div class="sec-head">
+      <div class="sec-title">安全攻防 · 间接提示注入</div>
+      <div class="sec-note">{{ sec_data.threat_model }} · 更新于 {{ sec_data.date }}</div>
+    </div>
+    <table class="sec">
+      <tr><th>攻击 ＼ 防御</th>{% for d in sec_defenses %}<th>{{ d }}</th>{% endfor %}</tr>
+      {% for atk in sec_attacks %}
+      <tr>
+        <td style="text-align:left"><b>{{ atk }}</b></td>
+        {% for d in sec_defenses %}
+          {% set cell = (sec_data.cells | selectattr("attack", "equalto", atk) | selectattr("defense", "equalto", d) | first) %}
+          <td class="{% if cell.asr >= 0.6 %}asr-high{% elif cell.asr >= 0.2 %}asr-mid{% else %}asr-low{% endif %}">
+            {{ "%.0f"|format(cell.asr * 100) }}%</td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+      <tr><td style="text-align:left"><b>干净内容任务保持</b></td>
+        {% for d in sec_defenses %}<td>{{ "%.0f"|format(sec_data.preservation[d] * 100) }}%</td>{% endfor %}
+      </tr>
+    </table>
+    <div class="hint" style="margin-top:10px;">ASR=攻击成功率（越低越好，绿色安全）；任务保持率=防御不破坏正常打分任务的比例（越高越好）。实验设置：3 类攻击载荷 × 3 级防御（无/系统提示加固/Spotlighting 标记隔离）。</div>
+  </section>
+  {% endif %}
+
+  <section class="card">
+    <div class="sec-head">
+      <div class="sec-title">最近抓取</div>
+      <div class="sec-note">OpenAlex / arXiv 双源 · 限流自动降级 · 点击标题深度阅读</div>
+    </div>
+    {% for p in papers %}
+      <div class="paper">
+        <div class="t"><a href="/paper/{{ p.paper_id }}">{{ p.title }}</a><a class="ext" href="{{ p.abs_url }}" target="_blank" rel="noopener">原文 ↗</a></div>
+        <div class="m">
+          <span>{{ p.published }}</span>
+          <span>{{ p.authors[:3]|join(', ') }}{% if p.authors|length > 3 %} et al.{% endif %}</span>
+          {% for c in p.categories[:3] %}<span class="pill">{{ c }}</span>{% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+
+</main>
+
+<footer>paper-agent · <b>评测层</b>（检索命中 / 摘要忠实度）与<b>安全层</b>（提示注入攻防）持续开发中 · 抓取→入库→检索→日报 全链路本地运行</footer>
+</body>
+</html>
