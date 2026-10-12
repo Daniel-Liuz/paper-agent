@@ -4,26 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>深度阅读 · paper-agent</title>
+<script src="/static/mermaid.min.js"></script>
 <style>
   :root { --fg:#111827; --muted:#6b7280; --faint:#9ca3af; --line:#e8eaf0; --bg:#f4f5f9;
           --accent:#4f46e5; --accent-2:#7c3aed; --accent-soft:#eef2ff; }
   * { box-sizing:border-box; margin:0; }
   body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-         background:var(--bg); color:var(--fg); line-height:1.7; }
+         background:var(--bg); color:var(--fg); line-height:1.75; }
   .hero { background:linear-gradient(135deg,#1e1b4b,#312e81 50%,#5b21b6); color:#fff; padding:34px 24px; }
-  .hero-inner { max-width:860px; margin:0 auto; }
+  .hero-inner { max-width:880px; margin:0 auto; }
   .back { color:#c7d2fe; text-decoration:none; font-size:13px; }
   .back:hover { color:#fff; }
   .hero h1 { font-size:21px; margin:12px 0 6px; line-height:1.45; }
-  .hero .m { color:#c7d2fe; font-size:13px; }
-  main { max-width:860px; margin:-26px auto 0; padding:0 20px 44px; display:grid; gap:20px; }
+  .hero .m { color:#c7d2fe; font-size:13px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .mode { background:rgba(255,255,255,.14); border-radius:6px; padding:1px 9px; font-size:12px; }
+  .mode.full { background:rgba(16,185,129,.35); }
+  main { max-width:880px; margin:-26px auto 0; padding:0 20px 44px; display:grid; gap:20px; }
   .card { background:#fff; border:1px solid var(--line); border-radius:14px;
-          box-shadow:0 1px 2px rgba(17,24,39,.05),0 4px 16px rgba(17,24,39,.05); padding:26px 28px; }
+          box-shadow:0 1px 2px rgba(17,24,39,.05),0 4px 16px rgba(17,24,39,.05); padding:26px 30px; }
   .sec-title { font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase;
                color:var(--faint); margin-bottom:12px; }
-  .reading h3 { font-size:15px; margin:18px 0 6px; padding-left:10px; border-left:3px solid var(--accent-2); }
-  .reading p { font-size:14.5px; margin:6px 0; }
+  .reading h2 { font-size:16.5px; margin:24px 0 8px; padding-left:11px; border-left:3px solid var(--accent-2); }
+  .reading h3 { font-size:14.5px; margin:14px 0 6px; color:#374151; }
+  .reading p { font-size:14.5px; margin:8px 0; }
   .reading ul { padding-left:22px; font-size:14.5px; }
+  .reading pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px;
+                 overflow-x:auto; font-size:12.5px; line-height:1.5; }
+  .reading .mermaid { background:#fff; text-align:center; margin:14px 0; }
   .paper { padding:12px 2px; border-bottom:1px solid var(--line); }
   .paper:last-child { border-bottom:0; }
   .paper .t { font-weight:600; font-size:14.5px; }
@@ -32,6 +39,7 @@
   .paper .m { color:var(--muted); font-size:12.5px; margin-top:3px; }
   .pill { background:#f1f2f7; color:#4b5563; border-radius:5px; padding:1px 8px; font-size:11.5px; margin-right:6px; }
   .pill.score { background:var(--accent-soft); color:var(--accent); font-weight:700; }
+  .pill.cite { background:#ecfdf5; color:#059669; }
   .empty { text-align:center; color:var(--muted); padding:40px 0; }
 </style>
 </head>
@@ -41,15 +49,34 @@
   <div class="hero-inner">
     <a class="back" href="/">&larr; 返回 paper-agent</a>
     <h1>{{ paper.title }}</h1>
-    <div class="m">{{ paper.published }} ｜ {{ paper.authors[:5]|join(', ') }}{% if paper.authors|length > 5 %} et al.{% endif %}
-       ｜ <a href="{{ paper.abs_url }}" target="_blank" rel="noopener" style="color:#a5b4fc">原文链接 ↗</a></div>
+    <div class="m">
+      <span class="mode {% if has_fulltext %}full{% endif %}">
+        {% if has_fulltext %}全文精读（PDF）{% else %}摘要精读{% endif %}</span>
+      <span>{{ paper.published }}</span>
+      <span>{{ paper.authors[:5]|join(', ') }}{% if paper.authors|length > 5 %} et al.{% endif %}</span>
+      <a href="{{ paper.abs_url }}" target="_blank" rel="noopener" style="color:#a5b4fc">原文 ↗</a>
+    </div>
   </div>
 </div>
 <main>
   <div class="card">
-    <div class="sec-title">深度解读 · agentic RAG（检索相关工作 → 结构化生成）</div>
+    <div class="sec-title">深度解读 · agentic RAG（全文/摘要 + 相关工作 + 引用网络 → 结构化生成）</div>
     <div class="reading">{{ html | safe }}</div>
   </div>
+
+  {% if citations %}
+  <div class="card">
+    <div class="sec-title">引用网络 · 最新引用本文的论文（OpenAlex 反查）</div>
+    {% for c in citations %}
+    <div class="paper">
+      <div class="t"><a href="/paper/{{ c.paper_id }}">{{ c.title }}</a>
+        <a class="ext" style="font-size:12px;color:#9ca3af;text-decoration:none" href="{{ c.abs_url }}" target="_blank" rel="noopener">↗</a></div>
+      <div class="m"><span class="pill cite">引用本文</span>{{ c.published }}</div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
   <div class="card">
     <div class="sec-title">向量检索的相关工作（FAISS Top-5）</div>
     {% for r in related %}
@@ -60,6 +87,24 @@
     {% endfor %}
   </div>
 </main>
+
+<script>
+  // 把 markdown 渲染出的 <pre><code class="language-mermaid"> 转为 mermaid 图
+  (function () {
+    var blocks = document.querySelectorAll('pre code.language-mermaid, pre > code[class*="mermaid"]');
+    if (!blocks.length) return;
+    if (typeof mermaid === 'undefined') { console.warn('mermaid 未加载'); return; }
+    mermaid.initialize({ startOnLoad: false, theme: 'default', flowchart: { curve: 'basis' } });
+    blocks.forEach(function (code, i) {
+      var div = document.createElement('div');
+      div.className = 'mermaid';
+      div.textContent = code.textContent;
+      var pre = code.closest('pre');
+      pre.replaceWith(div);
+    });
+    mermaid.run({ querySelector: '.mermaid' }).catch(function (e) { console.warn(e); });
+  })();
+</script>
 {% else %}
 <div class="empty">论文不存在（paper_id 无效或数据未抓取）。<a href="/">返回首页</a></div>
 {% endif %}

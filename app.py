@@ -13,6 +13,7 @@ from pathlib import Path
 import faiss
 import markdown
 from fastapi import FastAPI, Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from config import DATA_DIR, OUT_DIR, EMBED_MODEL, FAISS_INDEX, META_STORE
@@ -21,6 +22,7 @@ import reading
 
 app = FastAPI(title="paper-agent")
 templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")  # mermaid.js 等本地静态资源
 
 
 def load_json(name: str):
@@ -145,12 +147,13 @@ async def search(request: Request, q: str = "", k: int = 10):
 
 @app.get("/paper/{paper_id}")
 async def paper_detail(request: Request, paper_id: str):
-    """深度阅读页：目标论文 + 向量检索的相关工作 → LLM 结构化解读（带缓存）。
-    首次访问需调一次 LLM，约 10-30 秒，之后命中缓存秒开。"""
+    """深度阅读页 v2：全文精读（PDF 提取）+ 向量相关工作 + 引用网络反查 + mermaid 方法图。
+    首次访问需下载 PDF 与调用 LLM（约 15-60 秒），之后命中缓存秒开。"""
     paper = reading.find_paper(paper_id)
     if paper is None:
         return templates.TemplateResponse(request, "detail.html",
-                                          {"paper": None, "html": "", "related": []},
+                                          {"paper": None, "html": "", "related": [],
+                                           "citations": [], "has_fulltext": False},
                                           status_code=404)
 
     related: list[dict] = []
@@ -170,6 +173,10 @@ async def paper_detail(request: Request, paper_id: str):
         except Exception as err:  # 向量化不可用时，深度阅读退化为"仅原文解读"
             print(f"[warn] 相关工作检索停用：{err}")
 
-    html = reading.get_reading(paper, related)
+    fulltext = reading.get_fulltext(paper)
+    citations = reading.citing_papers(paper_id)
+    html = reading.get_reading(paper, related, fulltext=fulltext, citations=citations)
     return templates.TemplateResponse(request, "detail.html",
-                                      {"paper": paper, "html": html, "related": related})
+                                      {"paper": paper, "html": html, "related": related,
+                                       "citations": citations,
+                                       "has_fulltext": bool(fulltext)})

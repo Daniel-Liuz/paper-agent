@@ -6,3 +6,4 @@ uvicorn
 jinja2
 markdown
 numpy
+pymupdf
