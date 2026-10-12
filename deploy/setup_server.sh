@@ -34,7 +34,8 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 systemctl daemon-reload
-systemctl enable --now paper-agent
+systemctl enable paper-agent
+systemctl restart paper-agent   # 关键：代码已更新时旧进程不会自动加载，必须重启
 sleep 4
 # 内容级自检：确认 8100 上是本应用（避免误撞其他服务的 200 假阳性）
 curl -s http://localhost:8100/ | grep -q paper-agent && echo "本机自检: paper-agent 内容确认" || echo "警告: 8100 自检未通过，查 journalctl -u paper-agent"

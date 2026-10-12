@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>深度阅读 · paper-agent</title>
-<script src="/static/mermaid.min.js"></script>
 <style>
   :root { --fg:#111827; --muted:#6b7280; --faint:#9ca3af; --line:#e8eaf0; --bg:#f4f5f9;
           --accent:#4f46e5; --accent-2:#7c3aed; --accent-soft:#eef2ff; }
@@ -88,22 +87,30 @@
   </div>
 </main>
 
+<script src="/static/mermaid.min.js" defer></script>
 <script>
-  // 把 markdown 渲染出的 <pre><code class="language-mermaid"> 转为 mermaid 图
-  (function () {
+  // mermaid v9 渲染：把 markdown 的 <pre><code class="language-mermaid"> 转成图。
+  window.addEventListener('DOMContentLoaded', function () {
     var blocks = document.querySelectorAll('pre code.language-mermaid, pre > code[class*="mermaid"]');
     if (!blocks.length) return;
-    if (typeof mermaid === 'undefined') { console.warn('mermaid 未加载'); return; }
-    mermaid.initialize({ startOnLoad: false, theme: 'default', flowchart: { curve: 'basis' } });
-    blocks.forEach(function (code, i) {
+    var divs = [];
+    blocks.forEach(function (code) {
       var div = document.createElement('div');
       div.className = 'mermaid';
-      div.textContent = code.textContent;
-      var pre = code.closest('pre');
-      pre.replaceWith(div);
+      div.textContent = code.textContent;  // textContent 自动解码 &gt; 等实体
+      code.closest('pre').replaceWith(div);
+      divs.push(div);
     });
-    mermaid.run({ querySelector: '.mermaid' }).catch(function (e) { console.warn(e); });
-  })();
+    function tryInit(tries) {
+      if (typeof mermaid !== 'undefined') {
+        mermaid.initialize({ startOnLoad: false, theme: 'neutral', flowchart: { curve: 'basis' } });
+        try { mermaid.init(undefined, divs); } catch (e) { console.warn('mermaid init:', e); }
+      } else if (tries > 0) {
+        setTimeout(function () { tryInit(tries - 1); }, 300);  // 等 defer 脚本就绪
+      }
+    }
+    tryInit(10);
+  });
 </script>
 {% else %}
 <div class="empty">论文不存在（paper_id 无效或数据未抓取）。<a href="/">返回首页</a></div>

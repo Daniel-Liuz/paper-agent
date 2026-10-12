@@ -103,6 +103,26 @@
   .chip.s0,.chip.s2 { background:#f1f2f7; color:#6b7280; }
 
   /* ---------- 日报 ---------- */
+  /* ---------- 日报（结构化 + 标签筛选） ---------- */
+  .tagbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
+  .tagchip { border:1px solid var(--line); background:#fafbff; color:#4b5563;
+    border-radius:999px; padding:5px 14px; font-size:12.5px; cursor:pointer;
+    transition:all .12s; }
+  .tagchip:hover { border-color:var(--accent); color:var(--accent); }
+  .tagchip.active { background:linear-gradient(135deg,var(--accent),var(--accent-2));
+    color:#fff; border-color:transparent; font-weight:600; }
+  .ditem { padding:16px 4px; border-bottom:1px solid var(--line); }
+  .ditem:last-child { border-bottom:0; }
+  .dhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .stars { color:#f59e0b; font-size:13px; letter-spacing:1px; flex:none; }
+  .dtitle { font-weight:600; font-size:15px; text-decoration:none; color:var(--fg); }
+  .dtitle:hover { color:var(--accent); }
+  .dmeta { color:var(--muted); font-size:12.5px; margin-top:4px; }
+  .dsummary { font-size:14px; color:#374151; margin-top:7px; line-height:1.7; }
+  .dtags { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+  .dtag { background:var(--accent-soft); color:var(--accent); border-radius:5px;
+    padding:1px 9px; font-size:11.5px; cursor:pointer; }
+  .digest { line-height:1.7; font-size:14px; }
   .digest h1 { font-size:18px; margin-bottom:6px; }
   .digest blockquote {
     border-left:3px solid var(--accent); background:var(--accent-soft);
@@ -202,12 +222,56 @@
   </section>
 
   {% if digest %}
-  <section class="card digest">
+  <section class="card">
     <div class="sec-head">
-      <div class="sec-title">最新日报 · agentic 生成</div>
-      <div class="sec-note">关键词初筛 → LLM 相关性打分与摘要</div>
+      <div class="sec-title">最新日报 · {{ digest.date }} · agentic 生成</div>
+      <div class="sec-note">关键词粗筛 → LLM 打分 / 摘要 / 标签 · 点标签筛选（自动记住偏好）</div>
     </div>
-    {{ digest.html | safe }}
+    {% if digest.entries %}
+    <div class="tagbar" id="tagbar">
+      <button class="tagchip active" data-tag="">全部 {{ digest.entries|length }}</button>
+      {% for t, c in digest.tag_counts %}
+      <button class="tagchip" data-tag="{{ t }}">{{ t }} {{ c }}</button>
+      {% endfor %}
+    </div>
+    {% for it in digest.entries %}
+    <div class="ditem" data-tags="{{ it.tags|join(',') }}">
+      <div class="dhead">
+        <span class="stars">{{ "★" * it.score }}{{ "☆" * (5 - it.score) }}</span>
+        <a class="dtitle" href="/paper/{{ it.paper_id }}">{{ it.title }}</a>
+        <a class="ext" href="{{ it.abs_url }}" target="_blank" rel="noopener">原文 ↗</a>
+      </div>
+      <div class="dmeta">{{ it.published }} ｜ {{ it.authors[:3]|join(', ') }}{% if it.authors|length > 3 %} et al.{% endif %} ｜ LLM 相关度 {{ it.score }}/5 ｜ 关键词命中 {{ it.hits }}</div>
+      <div class="dsummary">{{ it.summary }}</div>
+      <div class="dtags">{% for t in it.tags %}<span class="dtag" data-tag="{{ t }}">{{ t }}</span>{% endfor %}</div>
+    </div>
+    {% endfor %}
+    <script>
+      (function () {
+        var bar = document.getElementById('tagbar');
+        if (!bar) return;
+        var chips = bar.querySelectorAll('.tagchip');
+        var items = document.querySelectorAll('.ditem');
+        function apply(tag) {
+          chips.forEach(function (c) { c.classList.toggle('active', c.dataset.tag === tag); });
+          items.forEach(function (it) {
+            var tags = (it.dataset.tags || '').split(',');
+            it.style.display = (!tag || tags.indexOf(tag) >= 0) ? '' : 'none';
+          });
+          try { localStorage.setItem('pa_tag', tag); } catch (e) {}
+        }
+        chips.forEach(function (c) { c.addEventListener('click', function () { apply(c.dataset.tag); }); });
+        document.querySelectorAll('.dtag').forEach(function (d) {
+          d.addEventListener('click', function () { apply(d.dataset.tag); });
+        });
+        var saved = null;
+        try { saved = localStorage.getItem('pa_tag'); } catch (e) {}
+        if (saved) apply(saved);
+      })();
+    </script>
+    {% else %}
+    <div class="digest">{{ digest.html | safe }}</div>
+    {% endif %}
   </section>
   {% endif %}
 

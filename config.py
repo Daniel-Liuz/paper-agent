@@ -18,6 +18,12 @@ INTEREST_KEYWORDS = [
     "tool use", "multi-agent", "evaluation", "benchmark", "safety", "memory",
 ]
 
+# 内容标签体系：digest 打分时 LLM 从中选 1-3 个；网站日报区据此筛选（用户订阅体验）
+PAPER_TAGS = [
+    "Agent安全", "Agent评测", "多智能体", "工具调用", "RAG与检索",
+    "记忆机制", "推理能力", "基准与数据集", "RL训练", "多模态", "LLM应用",
+]
+
 # ---------- 入库 ----------
 EMBED_MODEL = "BAAI/bge-m3"
 FAISS_INDEX = DATA_DIR / "papers.index"

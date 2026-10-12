@@ -83,11 +83,22 @@ def latest_papers(n: int = 30) -> list[dict]:
 
 
 def latest_digest() -> dict | None:
-    files = sorted(OUT_DIR.glob("daily_*.md"), reverse=True)
-    if not files:
+    """日报数据：优先结构化 json（支持标签筛选），无则退回 markdown 渲染（旧数据）。"""
+    jfiles = sorted(OUT_DIR.glob("daily_*.json"), reverse=True)
+    if jfiles:
+        items = json.loads(jfiles[0].read_text(encoding="utf-8"))
+        counts: dict[str, int] = {}
+        for it in items:
+            for t in it.get("tags", []):
+                counts[t] = counts.get(t, 0) + 1
+        return {"date": jfiles[0].stem.removeprefix("daily_"), "entries": items,
+                "tag_counts": sorted(counts.items(), key=lambda kv: -kv[1])}
+    mfiles = sorted(OUT_DIR.glob("daily_*.md"), reverse=True)
+    if not mfiles:
         return None
-    text = files[0].read_text(encoding="utf-8")
-    return {"date": files[0].stem.removeprefix("daily_"),
+    text = mfiles[0].read_text(encoding="utf-8")
+    return {"date": mfiles[0].stem.removeprefix("daily_"), "items": [],
+            "tag_counts": [],
             "html": markdown.markdown(text, extensions=["tables"])}
 
 

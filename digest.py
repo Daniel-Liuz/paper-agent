@@ -20,13 +20,15 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from config import (DATA_DIR, OUT_DIR, INTEREST_KEYWORDS,
+from config import (DATA_DIR, OUT_DIR, INTEREST_KEYWORDS, PAPER_TAGS,
                     LLM_BASE_URL, LLM_MODEL, LLM_API_KEY)
 
 SYSTEM_PROMPT = (
     "你是论文筛选助手。用户研究兴趣：大模型 Agent、Agent 评测、Agent 安全。"
     "对给定论文打 1-5 相关性分（5=核心相关）并写两句话中文摘要（含方法与结论要点）。"
-    "只输出 JSON。"
+    '只输出 JSON：{"score": 1-5整数, "summary": "两句话中文摘要", '
+    '"tags": ["从给定标签表中选1-3个最贴切的"]}。'
+    f"标签表：{PAPER_TAGS}"
 )
 
 # 全流程成本计量：简历/评测用的工程数字（调用数、token 用量）
@@ -46,7 +48,7 @@ def llm_score_paper(paper: dict, system_prompt: str | None = None,
     user_prompt = (
         f"标题: {paper['title']}\n作者: {', '.join(paper['authors'][:5])}\n"
         f"发表日期: {paper['published']}\n摘要: {abstract}\n\n"
-        '请输出 JSON：{"score": 1-5的整数, "summary": "两句话中文摘要"}'
+        '请输出 JSON：{"score": 1-5的整数, "summary": "两句话中文摘要", "tags": ["标签表选1-3个"]}'
     )
     body = json.dumps({
         "model": LLM_MODEL,
@@ -77,7 +79,9 @@ def llm_score_paper(paper: dict, system_prompt: str | None = None,
             text = data["choices"][0]["message"]["content"]
             parsed = json.loads(text)
             score = max(1, min(5, int(parsed.get("score", 1))))  # 夹紧到 1-5
-            return {"score": score, "summary": str(parsed.get("summary", "")).strip()}
+            tags = [t for t in parsed.get("tags", []) if t in PAPER_TAGS][:3]  # 白名单校验
+            return {"score": score, "summary": str(parsed.get("summary", "")).strip(),
+                    "tags": tags}
         except (urllib.error.HTTPError, urllib.error.URLError,
                 KeyError, json.JSONDecodeError, ValueError) as err:
             last_err = err
@@ -86,7 +90,7 @@ def llm_score_paper(paper: dict, system_prompt: str | None = None,
             time.sleep(wait)
     # 三次都失败：降级——保留条目但无 LLM 信息（日报不因单篇失败而中断）
     print(f"  ✗ 放弃打分：{paper['title'][:50]}（{last_err}）")
-    return {"score": 0, "summary": ""}
+    return {"score": 0, "summary": "", "tags": []}
 
 
 def prescreen(papers: list[dict]) -> list[dict]:
@@ -116,8 +120,9 @@ def render(papers: list[dict], date_str: str, skipped: int) -> str:
         lines.append(f"## {i}. [{p['title']}]({p['abs_url']})")
         lines.append("")
         authors = ", ".join(p["authors"][:3]) + (" et al." if len(p["authors"]) > 3 else "")
+        tag_str = " · ".join(p.get("_tags") or []) or "未分类"
         lines.append(f"**{stars(p['_score'])}（{p['_score']}/5）** ｜ {p['published']} ｜ {authors} ｜ "
-                     f"关键词命中 {p['_hits']}")
+                     f"标签：{tag_str} ｜ 关键词命中 {p['_hits']}")
         if p.get("_summary"):
             lines.append("")
             lines.append(f"摘要：{p['_summary']}")
@@ -150,6 +155,7 @@ def main() -> None:
         print(f"[{i}/{len(to_score)}] {p['title'][:60]}")
         result = llm_score_paper(p)
         p["_score"], p["_summary"] = result["score"], result["summary"]
+        p["_tags"] = result["tags"]
         time.sleep(0.3)  # 对 API 礼貌一点
 
     md = render(to_score, args.date, skipped_count)
@@ -163,9 +169,12 @@ def main() -> None:
     out.write_text(md, encoding="utf-8")
     (OUT_DIR / "cost_latest.json").write_text(
         json.dumps({"date": args.date, **COST}, ensure_ascii=False), encoding="utf-8")
-    # 结构化结果同步落盘：评测层（eval.py 的忠实度 judge）要读它
+    # 结构化结果同步落盘：网站日报区（标签筛选）与评测层（忠实度 judge）都读它
     structured = [{"paper_id": p.get("paper_id"), "title": p["title"],
-                   "score": p.get("_score", 0), "summary": p.get("_summary", "")}
+                   "score": p.get("_score", 0), "summary": p.get("_summary", ""),
+                   "tags": p.get("_tags", []), "hits": p.get("_hits", 0),
+                   "authors": p.get("authors", [])[:4], "published": p.get("published", ""),
+                   "abs_url": p.get("abs_url", "")}
                   for p in to_score]
     (OUT_DIR / f"daily_{args.date}.json").write_text(
         json.dumps(structured, ensure_ascii=False, indent=1), encoding="utf-8")
