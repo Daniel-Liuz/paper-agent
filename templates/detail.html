@@ -144,9 +144,8 @@
   });
 </script>
 <script>
-  // mermaid 渲染三重保障（旧版根因：2.8MB 库慢网络下加载超 3s 重试窗口，图永不渲染）：
-  // ① pre→div 转换立即做（不依赖库）；② 库 onload 事件驱动 init（主路径）；
-  // ③ 轮询兜底 40×300ms=12s（防 onload 在缓存命中时不触发）；④ 全失败给可见提示。
+  // mermaid 渲染：幂等轮询直到 svg 出现（旧版根因：单次 init 在页面早期时序下静默不生效，
+  // 2.8MB 库慢加载又超重试窗口）。手动验证任何时候 init 都能成功，故按 400ms 间隔重试到成功。
   (function () {
     var blocks = document.querySelectorAll('pre code.language-mermaid, pre > code[class*="mermaid"]');
     var divs = [];
@@ -158,30 +157,20 @@
       divs.push(div);
     });
     if (!divs.length) return;
-    var done = false;
-    function render() {
-      if (done) return;
-      try {
-        mermaid.initialize({ startOnLoad: false, theme: 'neutral', flowchart: { curve: 'basis' } });
-        mermaid.init(undefined, divs);
-        done = !!divs[0].querySelector('svg');
-      } catch (e) {
-        console.warn('mermaid init:', e);
-        divs.forEach(function (d) { if (!d.querySelector('svg')) d.classList.add('failed'); });
+    var attempts = 0;
+    (function tick() {
+      if (divs[0].querySelector('svg')) return;  // 渲染成功，停止
+      if (typeof mermaid !== 'undefined') {
+        try {
+          mermaid.initialize({ startOnLoad: false, theme: 'neutral', flowchart: { curve: 'basis' } });
+          mermaid.init(undefined, divs);
+        } catch (e) { console.warn('mermaid init:', e); }
       }
-    }
-    var lib = document.getElementById('mermaid-lib');
-    if (lib) lib.addEventListener('load', function () {
-      if (typeof mermaid !== 'undefined') render();
-    });
-    var tries = 0;
-    (function poll() {
-      if (typeof mermaid !== 'undefined') { render(); return; }
-      if (++tries > 40) {  // 12 秒兜底窗口后放弃并提示
-        divs.forEach(function (d) { d.classList.add('failed'); });
+      if (++attempts > 30) {  // 约 12 秒兜底
+        divs.forEach(function (d) { if (!d.querySelector('svg')) d.classList.add('failed'); });
         return;
       }
-      setTimeout(poll, 300);
+      setTimeout(tick, 400);
     })();
   })();
 </script>
