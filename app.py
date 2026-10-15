@@ -12,7 +12,8 @@ from pathlib import Path
 
 import faiss
 import markdown
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -110,8 +111,11 @@ def fetched_today() -> int:
     return sum(1 for line in path.read_text(encoding="utf-8").splitlines() if line.strip())
 
 
+# 三个路由都必须是普通 def（不能用 async def）：内部 embed/FAISS/urllib 全是同步阻塞调用，
+# 放进 async def 会冻结整个事件循环——首访一篇论文的 15-60 秒内全站（含首页）无响应。
+# 普通 def 由 FastAPI 自动扔进线程池执行，互不阻塞。
 @app.get("/")
-async def home(request: Request):
+def home(request: Request):
     return templates.TemplateResponse(request, "index.html", {
         "papers": latest_papers(30),
         "digest": latest_digest(),
@@ -126,7 +130,7 @@ async def home(request: Request):
 
 
 @app.get("/search")
-async def search(request: Request, q: str = "", k: int = 10):
+def search(request: Request, q: str = "", k: int = 10):
     results: list[dict] = []
     idx = get_index()
     vec = None
@@ -157,14 +161,15 @@ async def search(request: Request, q: str = "", k: int = 10):
 
 
 @app.get("/paper/{paper_id}")
-async def paper_detail(request: Request, paper_id: str):
+def paper_detail(request: Request, paper_id: str):
     """深度阅读页 v2：全文精读（PDF 提取）+ 向量相关工作 + 引用网络反查 + mermaid 方法图。
     首次访问需下载 PDF 与调用 LLM（约 15-60 秒），之后命中缓存秒开。"""
     paper = reading.find_paper(paper_id)
     if paper is None:
         return templates.TemplateResponse(request, "detail.html",
                                           {"paper": None, "html": "", "related": [],
-                                           "citations": [], "has_fulltext": False},
+                                           "citations": [], "has_fulltext": False,
+                                           "truncated": False, "figures": []},
                                           status_code=404)
 
     related: list[dict] = []
@@ -185,9 +190,24 @@ async def paper_detail(request: Request, paper_id: str):
             print(f"[warn] 相关工作检索停用：{err}")
 
     fulltext = reading.get_fulltext(paper)
+    figures = reading.extract_figures(paper) if fulltext else []  # 摘要模式无 PDF 可抽
     citations = reading.citing_papers(paper_id)
     html = reading.get_reading(paper, related, fulltext=fulltext, citations=citations)
     return templates.TemplateResponse(request, "detail.html",
                                       {"paper": paper, "html": html, "related": related,
                                        "citations": citations,
-                                       "has_fulltext": bool(fulltext)})
+                                       "has_fulltext": bool(fulltext),
+                                       "truncated": bool(fulltext) and len(fulltext) >= 11900,
+                                       "figures": figures})
+
+
+@app.get("/figure/{paper_id}/{name}")
+def figure(paper_id: str, name: str):
+    """论文原图（extract_figures 抽取的 PNG，页码编码在文件名）。文件名白名单校验防目录穿越。"""
+    import re
+    if not re.fullmatch(r"[A-Za-z0-9]+_p\d+\.\d+\.png", name):
+        raise HTTPException(status_code=404)
+    path = OUT_DIR / "figures" / name
+    if not path.exists():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="image/png")

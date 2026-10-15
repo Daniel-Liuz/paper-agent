@@ -30,6 +30,21 @@
   .reading pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px;
                  overflow-x:auto; font-size:12.5px; line-height:1.5; }
   .reading .mermaid { background:#fff; text-align:center; margin:14px 0; }
+  .reading table { border-collapse:collapse; margin:12px 0; font-size:13.5px; }
+  .reading th, .reading td { border:1px solid var(--line); padding:6px 12px; text-align:left; }
+  .reading th { background:#f8fafc; font-weight:600; }
+  .reading blockquote { border-left:3px solid #94a3b8; background:#f8fafc; border-radius:0 8px 8px 0;
+                        margin:8px 0 12px; padding:8px 14px; color:#475569; }
+  .reading blockquote p { margin:2px 0; font-size:12.5px; font-family:Georgia,"Times New Roman",serif; }
+  .figs { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:16px; }
+  .figs figure { margin:0; }
+  .figs img { width:100%; border:1px solid var(--line); border-radius:10px; background:#fff; }
+  .figs figcaption { color:var(--muted); font-size:12px; margin-top:5px; text-align:center; }
+  .quick-glance { background:linear-gradient(135deg,#eef2ff,#f5f3ff); border:1px solid #e0e7ff;
+                  border-radius:12px; padding:16px 20px 14px; margin:4px 0 10px; }
+  .quick-glance h2 { border-left:0; padding-left:0; margin:0 0 4px; color:var(--accent); font-size:15px; }
+  .quick-glance p { margin:7px 0; }
+  .trunc-note { color:var(--muted); font-size:12px; margin:-4px 0 10px; }
   .paper { padding:12px 2px; border-bottom:1px solid var(--line); }
   .paper:last-child { border-bottom:0; }
   .paper .t { font-weight:600; font-size:14.5px; }
@@ -60,8 +75,25 @@
 <main>
   <div class="card">
     <div class="sec-title">深度解读 · agentic RAG（全文/摘要 + 相关工作 + 引用网络 → 结构化生成）</div>
+    {% if truncated %}
+    <div class="trunc-note">解读基于 PDF 前 20 页（正文截断至约 1.2 万字符），超长论文的实验与附录部分可能未覆盖</div>
+    {% endif %}
     <div class="reading">{{ html | safe }}</div>
   </div>
+
+  {% if figures %}
+  <div class="card">
+    <div class="sec-title">论文原图 · PyMuPDF 自动抽取（与解读互为佐证）</div>
+    <div class="figs">
+      {% for f in figures %}
+      <figure>
+        <img loading="lazy" src="/figure/{{ paper.paper_id }}/{{ f.name }}" alt="论文第{{ f.page }}页插图">
+        <figcaption>原文第 {{ f.page }} 页</figcaption>
+      </figure>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
 
   {% if citations %}
   <div class="card">
@@ -88,6 +120,24 @@
 </main>
 
 <script src="/static/mermaid.min.js" defer></script>
+<script>
+  // 把第一个 h2（三十秒速览）到下一个 h2 之间的内容包进浅色卡片，形成"电梯卡"效果。
+  window.addEventListener('DOMContentLoaded', function () {
+    var reading = document.querySelector('.reading');
+    if (!reading) return;
+    var firstH2 = reading.querySelector('h2');
+    if (!firstH2) return;
+    var wrap = document.createElement('div');
+    wrap.className = 'quick-glance';
+    firstH2.parentNode.insertBefore(wrap, firstH2);
+    var node = firstH2;
+    while (node && (node === firstH2 || node.tagName !== 'H2')) {
+      var next = node.nextElementSibling;  // 先记下后继再移动节点
+      wrap.appendChild(node);
+      node = next;
+    }
+  });
+</script>
 <script>
   // mermaid v9 渲染：把 markdown 的 <pre><code class="language-mermaid"> 转成图。
   window.addEventListener('DOMContentLoaded', function () {

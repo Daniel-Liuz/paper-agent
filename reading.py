@@ -7,6 +7,7 @@ v2 相比 v1 的三个升级：
 """
 import json
 import time
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -16,22 +17,33 @@ from config import LLM_BASE_URL, LLM_MODEL, LLM_API_KEY
 
 READINGS_DIR = None  # 延迟初始化（config 无 OUT_DIR 引入顺序问题，见 get_reading）
 FULLTEXT_DIR = None
+PDF_DIR = None
 UA = {"User-Agent": "paper-agent/0.2 (research-use)"}
 
 READING_SYSTEM = (
     "你是资深研究员的论文精读助手。基于给定的论文（全文或摘要）与相关工作信息，"
     "输出 markdown 中文深度解读。结构严格使用以下编号标题：\n"
-    "## 1 一句话定位\n"
+    "## 1 三十秒速览\n"
     "## 2 核心方法\n"
     "## 3 主要贡献\n"
     "## 4 局限与疑问\n"
     "## 5 与「大模型 Agent 评测与安全」方向的关联\n"
     "## 6 最相关的工作\n"
     "写作要求：\n"
-    "- 行文用连贯的短段落，尽量不用列表符号（- / *）；\n"
-    "- 「## 2 核心方法」一节必须包含一个 mermaid 代码块（```mermaid 开头，flowchart TD 或 LR），"
-    "用不超过 8 个节点描绘方法的数据流/模块关系，节点标签用简短中文、不要用引号包裹；"
-    "信息只够画研究流程时就画研究流程，不要硬凑模块图；\n"
+    "- 「## 1 三十秒速览」固定四项、每项独立成段（行间留空行），每段以加粗标签开头，"
+    "内容各一句话：**问题**：论文要解决什么；**思路**：核心方法一句话；"
+    "**关键数字**：最重要的实验数字（无则写「原文未提及」）；**值不值得读**：给读者的建议；\n"
+    "- 「## 2 核心方法」开头先放 mermaid 图，再用短段落按图中阶段逐段讲解。"
+    "mermaid 代码块（```mermaid 开头，flowchart TD 或 LR）用不超过 8 个节点描绘方法的数据流/模块关系，"
+    "节点标签用简短中文、不要用引号包裹；信息只够画研究流程时就画研究流程，不要硬凑模块图；"
+    "图后的每个自然段只讲图中的一个阶段，段落顺序与图的数据流方向一致；\n"
+    "- 「## 3 主要贡献」若论文含关键实验数字，先给一个 markdown 表格"
+    "（表头：对比对象｜指标｜数字），表格后再用短段落解读数字含义；\n"
+    "- 证据锚点：「三十秒速览」的关键数字、以及「## 3 主要贡献」表格后的解读段落，"
+    "必须在段后紧跟一条 blockquote 原文佐证，格式为：\n"
+    "> 原文：〈英文原句，直接摘自给定文本，最多两句，保留原数字〉\n"
+    "没有可摘的原文就整条省略，禁止改写或拼凑原文；\n"
+    "- 每个自然段不超过 3 句话；行文用连贯短段落，尽量不用列表符号（- / *）；\n"
     "- 只依据给定信息，不编造；信息不足处写「原文未提及」。"
 )
 
@@ -54,11 +66,33 @@ def _http_get(url: str, timeout: int = 60) -> bytes:
         return resp.read()
 
 
+def _ensure_pdf(paper: dict) -> Path | None:
+    """拿到 PDF 本地路径：命中 outputs/pdfs/ 缓存直接返回，否则下载（10MB 上限）。
+    正文抽取和原图抽取共用这份缓存，避免重复下载。"""
+    from config import OUT_DIR
+    global PDF_DIR
+    PDF_DIR = OUT_DIR / "pdfs"
+    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    pid = paper.get("paper_id") or paper.get("arxiv_id")
+    path = PDF_DIR / f"{pid}.pdf"
+    if path.exists():
+        return path
+    pdf_url = paper.get("pdf_url") or ""
+    if not pdf_url.startswith("http"):
+        return None
+    try:
+        path.write_bytes(_http_get(pdf_url, timeout=90)[: 10 * 1024 * 1024])
+        print(f"[pdf] 下载成功 {pid}（{path.stat().st_size // 1024} KB）")
+        return path
+    except Exception as err:
+        print(f"[pdf] 下载失败 {pid}: {err}")
+        return None
+
+
 def get_fulltext(paper: dict) -> str | None:
     """下载 PDF 提取正文（缓存到 outputs/fulltexts/）。失败返回 None → 退回摘要模式。"""
-    import io
-    from config import OUT_DIR
     global FULLTEXT_DIR
+    from config import OUT_DIR
     FULLTEXT_DIR = OUT_DIR / "fulltexts"
     FULLTEXT_DIR.mkdir(parents=True, exist_ok=True)
     pid = paper.get("paper_id") or paper.get("arxiv_id")
@@ -66,13 +100,12 @@ def get_fulltext(paper: dict) -> str | None:
     if cache.exists():
         text = cache.read_text(encoding="utf-8")
         return text or None
-    pdf_url = paper.get("pdf_url") or ""
-    if not pdf_url.startswith("http"):
+    pdf = _ensure_pdf(paper)
+    if pdf is None:
         return None
     try:
         import fitz  # PyMuPDF
-        pdf_bytes = _http_get(pdf_url, timeout=90)[: 10 * 1024 * 1024]  # 10MB 上限
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        doc = fitz.open(pdf)
         text = "\n".join(page.get_text() for page in doc[:20]).strip()[:12000]
         cache.write_text(text, encoding="utf-8")
         print(f"[fulltext] 提取成功 {pid}（{len(text)} 字符）")
@@ -80,6 +113,50 @@ def get_fulltext(paper: dict) -> str | None:
     except Exception as err:
         print(f"[fulltext] 失败 {pid}: {err}")
         return None
+
+
+def extract_figures(paper: dict, max_figures: int = 4) -> list[dict]:
+    """从 PDF 抽论文原图（缓存 outputs/figures/{pid}_p{页码}.{序号}.png）。
+    只取大图（过滤 logo/小图标），任何失败都静默返回 []，不影响解读主流程。"""
+    import fitz
+    from config import OUT_DIR
+    pid = paper.get("paper_id") or paper.get("arxiv_id")
+    fig_dir = OUT_DIR / "figures"
+    fig_dir.mkdir(parents=True, exist_ok=True)
+    cached = sorted(fig_dir.glob(f"{pid}_p*.*.png"))
+    if cached:  # 幂等：页码编码在文件名里，重访不重抽
+        out = []
+        for p in cached[:max_figures]:
+            page = p.name.split("_p", 1)[1].split(".", 1)[0]
+            out.append({"name": p.name, "page": int(page) if page.isdigit() else 0})
+        return out
+    pdf = _ensure_pdf(paper)
+    if pdf is None:
+        return []
+    try:
+        doc = fitz.open(pdf)
+        out, seen = [], set()
+        for pno in range(min(len(doc), 20)):
+            for img in doc[pno].get_images(full=True):
+                xref = img[0]
+                if xref in seen:
+                    continue
+                seen.add(xref)
+                pix = fitz.Pixmap(doc, xref)
+                if pix.width < 200 or pix.height < 150:  # logo/装饰线的尺寸下限
+                    continue
+                if pix.colorspace and pix.n > 4:  # CMYK 等色彩空间转 RGB
+                    pix = fitz.Pixmap(fitz.csRGB, pix)
+                name = f"{pid}_p{pno + 1}.{len(out) + 1}.png"
+                pix.save(fig_dir / name)
+                out.append({"name": name, "page": pno + 1})
+                if len(out) >= max_figures:
+                    return out
+        print(f"[figures] {pid}: 抽取 {len(out)} 张原图")
+        return out
+    except Exception as err:
+        print(f"[figures] 失败 {pid}: {err}")
+        return []
 
 
 def citing_papers(pid: str, n: int = 3) -> list[dict]:
@@ -99,20 +176,29 @@ def citing_papers(pid: str, n: int = 3) -> list[dict]:
         return []
 
 
-def _llm(system: str, user: str, max_tokens: int = 1600) -> str:
+def _llm(system: str, user: str, max_tokens: int = 1600, retries: int = 2) -> str:
     body = json.dumps({
         "model": LLM_MODEL,
         "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": user}],
         "temperature": 0.3, "max_tokens": max_tokens,
     }).encode("utf-8")
-    req = urllib.request.Request(
-        LLM_BASE_URL.rstrip("/") + "/chat/completions", data=body, method="POST",
-        headers={"Content-Type": "application/json",
-                 "Authorization": f"Bearer {LLM_API_KEY}"})
-    with urllib.request.urlopen(req, timeout=180) as resp:
-        data = json.loads(resp.read())
-    return data["choices"][0]["message"]["content"]
+    for attempt in range(retries + 1):
+        if attempt:
+            time.sleep(3 * attempt)  # 上游 429/503 过载：退避后重试，一次抖动不打穿整页
+        req = urllib.request.Request(
+            LLM_BASE_URL.rstrip("/") + "/chat/completions", data=body, method="POST",
+            headers={"Content-Type": "application/json",
+                     "Authorization": f"Bearer {LLM_API_KEY}"})
+        try:
+            with urllib.request.urlopen(req, timeout=180) as resp:
+                data = json.loads(resp.read())
+            return data["choices"][0]["message"]["content"]
+        except urllib.error.HTTPError as err:
+            if err.code in (429, 500, 502, 503, 504) and attempt < retries:
+                print(f"[llm] HTTP {err.code}，退避 {3 * attempt}s 重试（{attempt + 1}/{retries}）")
+                continue
+            raise
 
 
 def get_reading(paper: dict, related: list[dict], fulltext: str | None = None,
