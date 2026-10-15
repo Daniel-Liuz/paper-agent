@@ -13,7 +13,7 @@ from pathlib import Path
 
 import markdown
 
-from config import LLM_BASE_URL, LLM_MODEL, LLM_API_KEY
+from config import LLM_BASE_URL, LLM_MODEL, LLM_API_KEY, PROFILE_NAME
 
 READINGS_DIR = None  # 延迟初始化（config 无 OUT_DIR 引入顺序问题，见 get_reading）
 FULLTEXT_DIR = None
@@ -27,7 +27,7 @@ READING_SYSTEM = (
     "## 2 核心方法\n"
     "## 3 主要贡献\n"
     "## 4 局限与疑问\n"
-    "## 5 与「大模型 Agent 评测与安全」方向的关联\n"
+    f"## 5 与「{PROFILE_NAME}」方向的关联\n"
     "## 6 最相关的工作\n"
     "写作要求：\n"
     "- 「## 1 三十秒速览」固定四项、每项独立成段（行间留空行），每段以加粗标签开头，"

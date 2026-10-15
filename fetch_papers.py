@@ -26,13 +26,26 @@ from config import DATA_DIR
 
 OPENALEX = "https://api.openalex.org/works"
 MAILTO = "paper-agent@example.com"  # polite pool 标识（换成自己邮箱更好）
-DEFAULT_QUERY = "large language model agent"
+from config import FETCH_QUERY as DEFAULT_QUERY
 
 
-def http_get_json(url: str) -> dict:
+def http_get_json(url: str, retries: int = 3) -> dict:
+    """带退避重试：OpenAlex 过 Cloudflare 偶发 401/403/429/5xx（实测瞬时抖动，
+    无重试会让当天 cron 整条流水线失败）——退避后重试比换源先做。"""
+    import time as _t
+    import urllib.error as _ue
     req = urllib.request.Request(url, headers={"User-Agent": f"paper-agent/0.1 ({MAILTO})"})
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read())
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:
+                return json.loads(resp.read())
+        except _ue.HTTPError as err:
+            if err.code in (401, 403, 429, 500, 502, 503) and attempt < retries:
+                wait = 5 * (attempt + 1)
+                print(f"[fetch] HTTP {err.code}，退避 {wait}s 重试（{attempt + 1}/{retries}）")
+                _t.sleep(wait)
+                continue
+            raise
 
 
 def rebuild_abstract(inverted: dict | None) -> str:

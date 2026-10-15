@@ -6,226 +6,273 @@
 <title>paper-agent · 论文获取与理解工作流</title>
 <style>
   :root {
-    --fg:#111827; --muted:#6b7280; --faint:#9ca3af;
-    --line:#e8eaf0; --card:#ffffff; --bg:#f4f5f9;
+    --fg:#0f172a; --muted:#64748b; --faint:#94a3b8;
+    --line:#e2e8f0; --card:#ffffff; --bg:#f8fafc;
     --accent:#4f46e5; --accent-2:#7c3aed; --accent-soft:#eef2ff;
-    --green:#059669; --green-bg:#ecfdf5; --amber:#b45309; --amber-bg:#fffbeb;
-    --radius:14px;
-    --shadow:0 1px 2px rgba(17,24,39,.05), 0 4px 16px rgba(17,24,39,.05);
-    --shadow-lg:0 8px 30px rgba(79,70,229,.16);
+    --green:#059669; --green-bg:#ecfdf5; --amber:#b45309; --amber-bg:#fffbeb; --red:#dc2626;
+    --radius:16px;
+    --shadow:0 1px 2px rgba(15,23,42,.04), 0 4px 12px rgba(15,23,42,.04);
+    --shadow-lg:0 12px 40px rgba(79,70,229,.18);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
   }
   * { box-sizing:border-box; margin:0; }
-  html { -webkit-font-smoothing:antialiased; }
-  body {
-    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-    background:var(--bg); color:var(--fg); line-height:1.6;
-  }
+  html { -webkit-font-smoothing:antialiased; scroll-behavior:smooth; }
+  body { font-family:var(--font); background:var(--bg); color:var(--fg); line-height:1.65; }
   a { color:inherit; }
+  ::selection { background:#c7d2fe; }
 
-  /* ---------- Hero ---------- */
-  .hero {
-    background:linear-gradient(135deg,#1e1b4b 0%,#312e81 45%,#5b21b6 100%);
-    color:#fff; padding:44px 24px 96px;
+  /* ---------- 顶部导航 ---------- */
+  .nav {
+    position:sticky; top:0; z-index:50;
+    background:rgba(15,23,42,.82); backdrop-filter:blur(12px);
+    border-bottom:1px solid rgba(255,255,255,.08);
   }
-  .hero-inner { max-width:1000px; margin:0 auto; }
-  .brand { display:flex; align-items:center; gap:12px; }
-  .logo {
-    width:40px; height:40px; border-radius:11px; flex:none;
+  .nav-inner { max-width:1080px; margin:0 auto; padding:0 20px; height:52px;
+    display:flex; align-items:center; gap:18px; }
+  .nav .logo { display:flex; align-items:center; gap:9px; color:#fff; font-weight:700; font-size:14.5px; text-decoration:none; }
+  .nav .logo .mark { width:24px; height:24px; border-radius:7px;
     background:linear-gradient(135deg,#818cf8,#c084fc);
-    display:flex; align-items:center; justify-content:center;
-    font-size:20px; box-shadow:0 4px 14px rgba(129,140,248,.45);
-  }
-  .hero h1 { font-size:24px; font-weight:700; letter-spacing:.02em; }
-  .hero .tagline { color:#c7d2fe; font-size:13.5px; margin-top:2px; }
-  .pipeline {
-    display:flex; flex-wrap:wrap; gap:8px; align-items:center;
-    margin-top:22px; font-size:13px; color:#e0e7ff;
-  }
-  .pipeline .stage {
-    background:rgba(255,255,255,.09); border:1px solid rgba(255,255,255,.16);
-    backdrop-filter:blur(6px); padding:5px 13px; border-radius:999px;
-  }
-  .pipeline .arrow { color:#818cf8; font-weight:700; }
-  .stats { display:flex; gap:14px; margin-top:26px; flex-wrap:wrap; }
-  .stat {
-    background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.14);
-    backdrop-filter:blur(8px); border-radius:12px; padding:12px 18px; min-width:120px;
-  }
-  .stat b { display:block; font-size:22px; font-weight:700; }
-  .stat span { font-size:12px; color:#c7d2fe; }
+    display:flex; align-items:center; justify-content:center; font-size:13px; }
+  .nav .links { display:flex; gap:2px; margin-left:8px; }
+  .nav .links a { color:#c7d2fe; text-decoration:none; font-size:13px; padding:6px 12px; border-radius:8px; transition:all .15s; }
+  .nav .links a:hover { color:#fff; background:rgba(255,255,255,.09); }
+  .nav .gh { margin-left:auto; color:#c7d2fe; text-decoration:none; font-size:12.5px;
+    padding:6px 12px; border:1px solid rgba(255,255,255,.18); border-radius:8px; transition:all .15s; }
+  .nav .gh:hover { color:#fff; border-color:rgba(255,255,255,.4); }
 
-  /* ---------- 布局 ---------- */
-  main { max-width:1000px; margin:-64px auto 0; padding:0 20px 40px; display:grid; gap:22px; }
+  /* ---------- Hero：搜索为中心 ---------- */
+  .hero {
+    background:#0f172a;
+    background-image:
+      radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99,102,241,.35), transparent),
+      radial-gradient(ellipse 60% 40% at 80% 110%, rgba(168,85,247,.18), transparent);
+    color:#fff; padding:64px 24px 72px; text-align:center;
+  }
+  .hero-inner { max-width:760px; margin:0 auto; }
+  .hero .badge { display:inline-flex; align-items:center; gap:7px;
+    background:rgba(129,140,248,.12); border:1px solid rgba(129,140,248,.3);
+    color:#c7d2fe; font-size:12.5px; border-radius:999px; padding:5px 14px; margin-bottom:20px; }
+  .hero .badge .dot { width:6px; height:6px; border-radius:50%; background:#34d399; box-shadow:0 0 8px #34d399; }
+  .hero h1 { font-size:34px; font-weight:800; letter-spacing:-.01em; line-height:1.25; }
+  .hero h1 .grad { background:linear-gradient(90deg,#a5b4fc,#e9d5ff); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero .sub { color:#94a3b8; font-size:15px; margin-top:12px; }
+  .hero .pipeline { display:flex; flex-wrap:wrap; justify-content:center; gap:6px; align-items:center;
+    margin-top:18px; font-size:12px; color:#a5b4fc; }
+  .hero .pipeline .stage { background:rgba(148,163,184,.1); border:1px solid rgba(148,163,184,.18);
+    padding:3px 11px; border-radius:999px; }
+  .hero .pipeline .arrow { color:#6366f1; }
+
+  .searchbox { margin-top:30px; }
+  .searchbox form { display:flex; gap:10px; max-width:640px; margin:0 auto; }
+  .searchbox input {
+    flex:1; padding:15px 20px; font-size:15.5px; border:1px solid rgba(255,255,255,.14);
+    border-radius:13px; outline:none; background:rgba(255,255,255,.07); color:#fff;
+    transition:all .18s; font-family:var(--font);
+  }
+  .searchbox input::placeholder { color:#64748b; }
+  .searchbox input:focus { background:rgba(255,255,255,.11); border-color:#818cf8;
+    box-shadow:0 0 0 4px rgba(129,140,248,.18); }
+  .searchbox button {
+    padding:15px 30px; border:0; border-radius:13px; cursor:pointer;
+    font-size:14.5px; font-weight:700; color:#fff; font-family:var(--font);
+    background:linear-gradient(135deg,#6366f1,#8b5cf6); box-shadow:var(--shadow-lg);
+    transition:transform .13s, filter .13s;
+  }
+  .searchbox button:hover { transform:translateY(-1px); filter:brightness(1.08); }
+  .searchbox .tips { color:#64748b; font-size:12.5px; margin-top:11px; }
+  .searchbox .tips kbd { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12);
+    border-radius:5px; padding:1px 7px; font-size:11.5px; color:#a5b4fc; font-family:var(--font); cursor:pointer; }
+  .searchbox .tips kbd:hover { border-color:#818cf8; color:#c7d2fe; }
+
+  .hero .stats { display:flex; justify-content:center; gap:14px; margin-top:34px; flex-wrap:wrap; }
+  .stat { background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1);
+    border-radius:13px; padding:14px 26px; min-width:132px; backdrop-filter:blur(8px); }
+  .stat b { display:block; font-size:23px; font-weight:800; font-variant-numeric:tabular-nums;
+    background:linear-gradient(90deg,#e0e7ff,#c4b5fd); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .stat span { font-size:12px; color:#94a3b8; }
+
+  /* ---------- 布局与卡片 ---------- */
+  main { max-width:1080px; margin:-34px auto 0; padding:0 20px 48px; display:grid; gap:26px; position:relative; }
   section.card {
     background:var(--card); border:1px solid var(--line);
-    border-radius:var(--radius); box-shadow:var(--shadow); padding:24px 26px;
+    border-radius:var(--radius); box-shadow:var(--shadow); padding:28px 30px;
   }
-  .sec-head { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; }
-  .sec-title {
-    font-size:13px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--faint);
-  }
-  .sec-note { font-size:12.5px; color:var(--muted); }
-
-  /* ---------- 搜索 ---------- */
-  .search { display:flex; gap:10px; }
-  .search input {
-    flex:1; padding:13px 16px; font-size:15px; border:1.5px solid var(--line);
-    border-radius:11px; outline:none; transition:border .15s, box-shadow .15s; background:#fafafa;
-  }
-  .search input:focus { border-color:var(--accent); background:#fff; box-shadow:0 0 0 4px rgba(79,70,229,.10); }
-  .search button {
-    padding:13px 26px; border:0; border-radius:11px; cursor:pointer;
-    font-size:14.5px; font-weight:600; color:#fff;
-    background:linear-gradient(135deg,var(--accent),var(--accent-2));
-    box-shadow:var(--shadow-lg); transition:transform .12s, filter .12s;
-  }
-  .search button:hover { transform:translateY(-1px); filter:brightness(1.06); }
+  .sec-head { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:18px; }
+  .sec-title { display:flex; align-items:baseline; gap:10px; }
+  .sec-title .no { font-size:12px; font-weight:800; color:var(--accent); letter-spacing:.05em; font-variant-numeric:tabular-nums; }
+  .sec-title .name { font-size:17px; font-weight:700; }
+  .sec-note { font-size:12.5px; color:var(--muted); text-align:right; }
   .hint { color:var(--muted); font-size:13px; margin-top:10px; }
 
+  /* ---------- 搜索结果 ---------- */
+  .result-head { font-size:14px; color:var(--fg); margin-bottom:4px; }
+  .result-head b { color:var(--accent); }
+
   /* ---------- 论文条目 ---------- */
-  .paper {
-    padding:14px 2px; border-bottom:1px solid var(--line);
-    transition:background .12s; border-radius:8px;
-  }
-  .paper:hover { background:var(--accent-soft); }
+  .paper { padding:14px 12px; border-bottom:1px solid var(--line); border-left:3px solid transparent;
+    transition:all .14s; border-radius:8px; }
+  .paper:hover { background:var(--accent-soft); border-left-color:var(--accent); }
   .paper:last-child { border-bottom:0; }
-  .paper .t { font-weight:600; font-size:15px; }
+  .paper .t { font-weight:600; font-size:14.5px; }
   .paper .t a { text-decoration:none; }
   .paper .t a:hover { color:var(--accent); }
-  .paper .m { color:var(--muted); font-size:12.5px; margin-top:3px; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
-  .pill {
-    background:#f1f2f7; color:#4b5563; border-radius:5px; padding:1px 8px;
-    font-size:11.5px; white-space:nowrap;
-  }
+  .paper .m { color:var(--muted); font-size:12.5px; margin-top:4px; display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; }
+  .pill { background:#f1f5f9; color:#475569; border-radius:5px; padding:1px 8px; font-size:11.5px; white-space:nowrap; }
   .chip { border-radius:6px; padding:1px 8px; font-size:11.5px; font-weight:700; white-space:nowrap; }
   .chip.s5,.chip.s4 { background:var(--green-bg); color:var(--green); }
   .chip.s3 { background:var(--amber-bg); color:var(--amber); }
-  .chip.s0,.chip.s2 { background:#f1f2f7; color:#6b7280; }
+  .chip.s0,.chip.s2 { background:#f1f5f9; color:var(--muted); }
 
   /* ---------- 日报 ---------- */
-  /* ---------- 日报（结构化 + 标签筛选） ---------- */
-  .tagbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
-  .tagchip { border:1px solid var(--line); background:#fafbff; color:#4b5563;
-    border-radius:999px; padding:5px 14px; font-size:12.5px; cursor:pointer;
-    transition:all .12s; }
+  .tagbar { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px; }
+  .tagchip { border:1px solid var(--line); background:#fff; color:#475569;
+    border-radius:999px; padding:5px 15px; font-size:12.5px; cursor:pointer; transition:all .13s; font-family:var(--font); }
   .tagchip:hover { border-color:var(--accent); color:var(--accent); }
   .tagchip.active { background:linear-gradient(135deg,var(--accent),var(--accent-2));
     color:#fff; border-color:transparent; font-weight:600; }
-  .ditem { padding:16px 4px; border-bottom:1px solid var(--line); }
+  .ditem { padding:17px 12px; border-bottom:1px solid var(--line); border-left:3px solid transparent;
+    border-radius:8px; transition:all .14s; }
+  .ditem:hover { background:#fafbff; border-left-color:var(--accent-2); }
   .ditem:last-child { border-bottom:0; }
   .dhead { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; }
-  .stars { color:#f59e0b; font-size:13px; letter-spacing:1px; flex:none; }
-  .dtitle { font-weight:600; font-size:15px; text-decoration:none; color:var(--fg); }
+  .stars { color:#f59e0b; font-size:13px; letter-spacing:1.5px; flex:none; }
+  .dtitle { font-weight:600; font-size:14.5px; text-decoration:none; color:var(--fg); }
   .dtitle:hover { color:var(--accent); }
-  .dmeta { color:var(--muted); font-size:12.5px; margin-top:4px; }
-  .dsummary { font-size:14px; color:#374151; margin-top:7px; line-height:1.7; }
-  .dtags { margin-top:8px; display:flex; gap:6px; flex-wrap:wrap; }
+  .dmeta { color:var(--muted); font-size:12px; margin-top:5px; }
+  .dsummary { font-size:14px; color:#334155; margin-top:8px; line-height:1.75; }
+  .dtags { margin-top:9px; display:flex; gap:6px; flex-wrap:wrap; }
   .dtag { background:var(--accent-soft); color:var(--accent); border-radius:5px;
-    padding:1px 9px; font-size:11.5px; cursor:pointer; }
+    padding:1px 9px; font-size:11.5px; cursor:pointer; transition:all .13s; }
+  .dtag:hover { background:#e0e7ff; }
   .digest { line-height:1.7; font-size:14px; }
   .digest h1 { font-size:18px; margin-bottom:6px; }
-  .digest blockquote {
-    border-left:3px solid var(--accent); background:var(--accent-soft);
-    padding:8px 14px; border-radius:0 8px 8px 0; color:#4338ca; font-size:13px; margin:10px 0 4px;
-  }
-  .digest h2 {
-    font-size:15.5px; margin:20px 0 6px; padding-left:11px; border-left:3px solid var(--accent-2);
-  }
+  .digest blockquote { border-left:3px solid var(--accent); background:var(--accent-soft);
+    padding:8px 14px; border-radius:0 8px 8px 0; color:#4338ca; font-size:13px; margin:10px 0 4px; }
+  .digest h2 { font-size:15.5px; margin:20px 0 6px; padding-left:11px; border-left:3px solid var(--accent-2); }
   .digest h2 a { text-decoration:none; }
   .digest h2 a:hover { color:var(--accent-2); }
   .digest p { font-size:14px; margin:6px 0; }
   .digest hr { border:0; border-top:1px dashed var(--line); margin:16px 0; }
   .digest em { color:var(--faint); font-size:13px; }
 
-  /* ---------- 评测看板 & 安全攻防 ---------- */
-  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
-  .metric { background:#fafbff; border:1px solid var(--line); border-radius:11px; padding:12px 14px; }
-  .metric b { display:block; font-size:20px; color:var(--accent); }
+  /* ---------- 质量与安全（收尾区） ---------- */
+  .qa-grid { display:grid; grid-template-columns:1fr 1fr; gap:26px; }
+  .metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:12px; }
+  .metric { background:#fafbff; border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .metric b { display:block; font-size:21px; color:var(--accent); font-variant-numeric:tabular-nums; }
   .metric span { font-size:12px; color:var(--muted); }
   .metric small { display:block; color:var(--faint); font-size:11px; margin-top:2px; }
-  table.sec { border-collapse:collapse; width:100%; margin-top:6px; }
-  table.sec th, table.sec td {
-    border:1px solid var(--line); padding:8px 10px; font-size:13px; text-align:center;
-  }
+  table.sec { border-collapse:separate; border-spacing:0; width:100%; margin-top:6px;
+    border:1px solid var(--line); border-radius:10px; overflow:hidden; font-size:12.5px; }
+  table.sec th, table.sec td { padding:8px 9px; text-align:center; border-bottom:1px solid var(--line); }
+  table.sec tr:last-child td { border-bottom:0; }
   table.sec th { background:#fafbff; color:var(--muted); font-weight:600; }
-  .asr-high { color:#dc2626; font-weight:700; }
-  .asr-mid  { color:var(--amber); font-weight:600; }
-  .asr-low  { color:var(--green); font-weight:700; }
+  td.asr { font-weight:700; font-variant-numeric:tabular-nums; }
+  .asr-high { color:var(--red); }
+  .asr-mid  { color:var(--amber); }
+  .asr-low  { color:var(--green); }
   .ext { color:var(--faint); font-size:12px; text-decoration:none; margin-left:6px; }
   .ext:hover { color:var(--accent); }
 
-  footer { text-align:center; color:var(--faint); font-size:12.5px; padding:8px 20px 36px; }
+  footer { text-align:center; color:var(--faint); font-size:12.5px; padding:6px 20px 40px; }
   footer b { color:var(--accent); }
 
-  @media (max-width:640px) {
-    .hero { padding:32px 18px 84px; }
-    .search { flex-direction:column; }
-    section.card { padding:18px 16px; }
+  @media (max-width:760px) {
+    .nav .links { display:none; }
+    .hero { padding:44px 18px 60px; }
+    .hero h1 { font-size:25px; }
+    .searchbox form { flex-direction:column; }
+    .qa-grid { grid-template-columns:1fr; }
+    section.card { padding:20px 16px; }
+    .sec-note { display:none; }
   }
 </style>
 </head>
 <body>
 
-<div class="hero">
-  <div class="hero-inner">
-    <div class="brand">
-      <div class="logo">📄</div>
-      <div>
-        <h1>paper-agent</h1>
-        <div class="tagline">论文获取与理解 Agent 工作流 · 个人项目</div>
-      </div>
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="logo" href="#"><span class="mark">📄</span>paper-agent</a>
+    <div class="links">
+      <a href="#digest">日报</a>
+      <a href="#papers">论文库</a>
+      <a href="#quality">质量与安全</a>
     </div>
+    <a class="gh" href="https://github.com/Daniel-Liuz/paper-agent" target="_blank" rel="noopener">GitHub ↗</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-inner">
+    <div class="badge"><span class="dot"></span>在线 · 每日 07:00 自动抓取更新</div>
+    <h1>你的论文情报与精读<span class="grad"> Agent</span></h1>
+    <div class="sub">自动抓取 → 语义检索 → agentic 日报 → 全文精读（证据锚点 · 方法图 · 原文图）</div>
     <div class="pipeline">
       <span class="stage">多源抓取</span><span class="arrow">→</span>
-      <span class="stage">BGE-M3 / FAISS 入库</span><span class="arrow">→</span>
+      <span class="stage">BGE-M3 / FAISS</span><span class="arrow">→</span>
       <span class="stage">语义检索</span><span class="arrow">→</span>
       <span class="stage">agentic 日报</span><span class="arrow">→</span>
-      <span class="stage">评测 &amp; 注入攻防 v0.1</span>
+      <span class="stage">全文精读</span>
     </div>
+
+    <div class="searchbox">
+      <form action="/search" method="get">
+        <input type="text" name="q" placeholder="用自然语言搜论文，如：prompt injection 防御 / multi-agent 协作"
+               value="{{ query or '' }}" autocomplete="off">
+        <button type="submit">检索</button>
+      </form>
+      <div class="tips">试试：
+        <kbd onclick="document.querySelector('.searchbox input').value='prompt injection defense';document.querySelector('.searchbox form').submit()">prompt injection defense</kbd>
+        <kbd onclick="document.querySelector('.searchbox input').value='agent evaluation benchmark';document.querySelector('.searchbox form').submit()">agent evaluation</kbd>
+        <kbd onclick="document.querySelector('.searchbox input').value='multi-agent collaboration';document.querySelector('.searchbox form').submit()">multi-agent</kbd>
+      </div>
+    </div>
+
+    {% if query %}
+    <div class="stats" style="margin-top:26px;">
+      <div class="stat"><b>{{ results|length }}</b><span>条检索结果</span></div>
+    </div>
+    {% else %}
     <div class="stats">
-      <div class="stat"><b>{{ indexed }}</b><span>向量索引库</span></div>
+      <div class="stat"><b>{{ indexed }}</b><span>篇向量索引</span></div>
       <div class="stat"><b>{{ fetched }}</b><span>今日抓取</span></div>
       <div class="stat"><b>{{ digest.date if digest else '—' }}</b><span>最新日报</span></div>
     </div>
+    {% endif %}
   </div>
-</div>
+</header>
 
 <main>
 
+  {% if query %}
   <section class="card">
     <div class="sec-head">
-      <div class="sec-title">语义检索</div>
-      <div class="sec-note">查询文本 → BGE-M3 向量 → FAISS 余弦 Top-K</div>
+      <div class="sec-title"><span class="no">00</span><span class="name">检索结果</span></div>
+      <div class="sec-note">「{{ query }}」 · BGE-M3 向量 → FAISS 余弦 Top-K</div>
     </div>
-    <form class="search" action="/search" method="get">
-      <input type="text" name="q" placeholder="试试：prompt injection 防御 / multi-agent 协作 / agent evaluation benchmark"
-             value="{{ query or '' }}">
-      <button type="submit">检索</button>
-    </form>
-    {% if query %}
-      <div class="hint">「{{ query }}」的 Top {{ results|length }} 结果：</div>
-      {% for r in results %}
-        <div class="paper">
-          <div class="t"><a href="{{ r.abs_url }}" target="_blank" rel="noopener">{{ r.title }}</a>
-            <span class="chip s{{ '5' if r.score|float >= 0.75 else '3' if r.score|float >= 0.5 else '2' }}">{{ r.score }}</span>
-          </div>
-          <div class="m">
-            <span>{{ r.published }}</span>
-            <span>{{ r.authors[:3]|join(', ') }}{% if r.authors|length > 3 %} et al.{% endif %}</span>
-            <span class="pill">{{ r.source }}</span>
-          </div>
+    <div class="result-head">共 <b>{{ results|length }}</b> 条，按语义相似度排序，点击标题进入深度阅读：</div>
+    {% for r in results %}
+      <div class="paper">
+        <div class="t"><a href="/paper/{{ r.paper_id }}">{{ r.title }}</a>
+          <span class="chip s{{ '5' if r.score|float >= 0.75 else '3' if r.score|float >= 0.5 else '2' }}">{{ r.score }}</span>
         </div>
-      {% else %}
-        <div class="hint">没有结果——索引可能还没建（跑 ingest.py），或换个说法试试。</div>
-      {% endfor %}
-    {% endif %}
+        <div class="m">
+          <span>{{ r.published }}</span>
+          <span>{{ r.authors[:3]|join(', ') }}{% if r.authors|length > 3 %} et al.{% endif %}</span>
+          <span class="pill">{{ r.source }}</span>
+        </div>
+      </div>
+    {% else %}
+      <div class="hint">没有结果——索引可能还没建（跑 ingest.py），或换个说法试试。</div>
+    {% endfor %}
   </section>
+  {% endif %}
 
   {% if digest %}
-  <section class="card">
+  <section class="card" id="digest">
     <div class="sec-head">
-      <div class="sec-title">最新日报 · {{ digest.date }} · agentic 生成</div>
-      <div class="sec-note">关键词粗筛 → LLM 打分 / 摘要 / 标签 · 点标签筛选（自动记住偏好）</div>
+      <div class="sec-title"><span class="no">01</span><span class="name">今日日报</span></div>
+      <div class="sec-note">{{ digest.date }} · 关键词粗筛 → LLM 打分 / 摘要 / 标签 · 点标签筛选（自动记住偏好）</div>
     </div>
     {% if digest.entries %}
     <div class="tagbar" id="tagbar">
@@ -275,61 +322,9 @@
   </section>
   {% endif %}
 
-  {% if eval_data %}
-  <section class="card">
+  <section class="card" id="papers">
     <div class="sec-head">
-      <div class="sec-title">评测看板</div>
-      <div class="sec-note">更新于 {{ eval_data.date }} · 索引 {{ eval_data.n_index }} 篇</div>
-    </div>
-    <div class="metrics">
-      <div class="metric"><b>{{ "%.2f"|format(eval_data.retrieval.mrr) }}</b><span>检索 MRR</span>
-        <small>自检索协议，n={{ eval_data.retrieval.n }}</small></div>
-      <div class="metric"><b>{{ "%.0f%%"|format(eval_data.retrieval.hit5 * 100) }}</b><span>Hit@5</span>
-        <small>标题查询能否找回原文</small></div>
-      <div class="metric"><b>{{ "%.0f%%"|format(eval_data.retrieval.hit1 * 100) }}</b><span>Hit@1</span></div>
-      {% if eval_data.faithfulness.mean %}
-      <div class="metric"><b>{{ eval_data.faithfulness.mean }}/5</b><span>摘要忠实度</span>
-        <small>LLM-as-judge，n={{ eval_data.faithfulness.n }}，均延迟 {{ eval_data.faithfulness.judge_latency_ms }}ms</small></div>
-      {% endif %}
-    </div>
-    {% if eval_data.faithfulness.flagged %}
-    <div class="hint" style="margin-top:10px;">⚠ 被标记的疑似不支持陈述：</div>
-    {% for f in eval_data.faithfulness.flagged %}
-      <div class="hint">· {{ f.title }} →「{{ f.unsupported }}」</div>
-    {% endfor %}
-    {% endif %}
-  </section>
-  {% endif %}
-
-  {% if sec_data %}
-  <section class="card">
-    <div class="sec-head">
-      <div class="sec-title">安全攻防 · 间接提示注入</div>
-      <div class="sec-note">{{ sec_data.threat_model }} · 更新于 {{ sec_data.date }}</div>
-    </div>
-    <table class="sec">
-      <tr><th>攻击 ＼ 防御</th>{% for d in sec_defenses %}<th>{{ d }}</th>{% endfor %}</tr>
-      {% for atk in sec_attacks %}
-      <tr>
-        <td style="text-align:left"><b>{{ atk }}</b></td>
-        {% for d in sec_defenses %}
-          {% set cell = (sec_data.cells | selectattr("attack", "equalto", atk) | selectattr("defense", "equalto", d) | first) %}
-          <td class="{% if cell.asr >= 0.6 %}asr-high{% elif cell.asr >= 0.2 %}asr-mid{% else %}asr-low{% endif %}">
-            {{ "%.0f"|format(cell.asr * 100) }}%</td>
-        {% endfor %}
-      </tr>
-      {% endfor %}
-      <tr><td style="text-align:left"><b>干净内容任务保持</b></td>
-        {% for d in sec_defenses %}<td>{{ "%.0f"|format(sec_data.preservation[d] * 100) }}%</td>{% endfor %}
-      </tr>
-    </table>
-    <div class="hint" style="margin-top:10px;">ASR=攻击成功率（越低越好，绿色安全）；任务保持率=防御不破坏正常打分任务的比例（越高越好）。实验设置：3 类攻击载荷 × 3 级防御（无/系统提示加固/Spotlighting 标记隔离）。</div>
-  </section>
-  {% endif %}
-
-  <section class="card">
-    <div class="sec-head">
-      <div class="sec-title">最近抓取</div>
+      <div class="sec-title"><span class="no">02</span><span class="name">论文库</span></div>
       <div class="sec-note">OpenAlex / arXiv 双源 · 限流自动降级 · 点击标题深度阅读</div>
     </div>
     {% for p in papers %}
@@ -344,8 +339,62 @@
     {% endfor %}
   </section>
 
+  <section class="card" id="quality">
+    <div class="sec-head">
+      <div class="sec-title"><span class="no">03</span><span class="name">质量与安全 · 系统自检</span></div>
+      <div class="sec-note">自己的系统自己测：检索质量 / 摘要忠实度 / 注入攻防</div>
+    </div>
+    <div class="qa-grid">
+      {% if eval_data %}
+      <div>
+        <div class="sec-title" style="margin-bottom:12px;"><span class="name" style="font-size:14px;">评测看板</span></div>
+        <div class="metrics">
+          <div class="metric"><b>{{ "%.2f"|format(eval_data.retrieval.mrr) }}</b><span>检索 MRR</span>
+            <small>自检索协议 n={{ eval_data.retrieval.n }}</small></div>
+          <div class="metric"><b>{{ "%.0f%%"|format(eval_data.retrieval.hit5 * 100) }}</b><span>Hit@5</span>
+            <small>标题查询能否找回原文</small></div>
+          <div class="metric"><b>{{ "%.0f%%"|format(eval_data.retrieval.hit1 * 100) }}</b><span>Hit@1</span><small>&nbsp;</small></div>
+          {% if eval_data.faithfulness.mean %}
+          <div class="metric"><b>{{ eval_data.faithfulness.mean }}/5</b><span>摘要忠实度</span>
+            <small>LLM-as-judge n={{ eval_data.faithfulness.n }} · {{ eval_data.faithfulness.judge_latency_ms }}ms</small></div>
+          {% endif %}
+        </div>
+        {% if eval_data.faithfulness.flagged %}
+        <div class="hint">⚠ 被标记的疑似不支持陈述：</div>
+        {% for f in eval_data.faithfulness.flagged %}
+        <div class="hint">· {{ f.title }} →「{{ f.unsupported }}」</div>
+        {% endfor %}
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if sec_data %}
+      <div>
+        <div class="sec-title" style="margin-bottom:12px;"><span class="name" style="font-size:14px;">注入攻防矩阵 · ASR</span></div>
+        <table class="sec">
+          <tr><th>攻击 ＼ 防御</th>{% for d in sec_defenses %}<th>{{ d }}</th>{% endfor %}</tr>
+          {% for atk in sec_attacks %}
+          <tr>
+            <td style="text-align:left"><b>{{ atk }}</b></td>
+            {% for d in sec_defenses %}
+            {% set cell = (sec_data.cells | selectattr("attack", "equalto", atk) | selectattr("defense", "equalto", d) | first) %}
+            <td class="asr {% if cell.asr >= 0.6 %}asr-high{% elif cell.asr >= 0.2 %}asr-mid{% else %}asr-low{% endif %}">
+              {{ "%.0f"|format(cell.asr * 100) }}%</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+          <tr><td style="text-align:left"><b>干净内容任务保持</b></td>
+            {% for d in sec_defenses %}<td>{{ "%.0f"|format(sec_data.preservation[d] * 100) }}%</td>{% endfor %}
+          </tr>
+        </table>
+        <div class="hint">ASR=攻击成功率（越低越好）；任务保持率=防御不破坏正常任务的比例。3 攻击 × 3 防御 × 8 载体。</div>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
 </main>
 
-<footer>paper-agent · <b>评测层</b>（检索命中 / 摘要忠实度）与<b>安全层</b>（提示注入攻防）持续开发中 · 抓取→入库→检索→日报 全链路本地运行</footer>
+<footer>paper-agent · <b>评测层</b>（检索命中 / 摘要忠实度）与<b>安全层</b>（提示注入攻防）内建 · 抓取→入库→检索→日报→精读 全链路自动运行</footer>
 </body>
 </html>

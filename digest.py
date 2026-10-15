@@ -20,11 +20,11 @@ import urllib.request
 from datetime import datetime
 from pathlib import Path
 
-from config import (DATA_DIR, OUT_DIR, INTEREST_KEYWORDS, PAPER_TAGS,
+from config import (DATA_DIR, OUT_DIR, INTEREST_KEYWORDS, PAPER_TAGS, PROFILE_INTEREST,
                     LLM_BASE_URL, LLM_MODEL, LLM_API_KEY)
 
 SYSTEM_PROMPT = (
-    "你是论文筛选助手。用户研究兴趣：大模型 Agent、Agent 评测、Agent 安全。"
+    f"你是论文筛选助手。用户研究兴趣：{PROFILE_INTEREST}。"
     "对给定论文打 1-5 相关性分（5=核心相关）并写两句话中文摘要（含方法与结论要点）。"
     '只输出 JSON：{"score": 1-5整数, "summary": "两句话中文摘要", '
     '"tags": ["从给定标签表中选1-3个最贴切的"]}。'

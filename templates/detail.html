@@ -29,7 +29,10 @@
   .reading ul { padding-left:22px; font-size:14.5px; }
   .reading pre { background:#0f172a; color:#e2e8f0; border-radius:10px; padding:14px 16px;
                  overflow-x:auto; font-size:12.5px; line-height:1.5; }
-  .reading .mermaid { background:#fff; text-align:center; margin:14px 0; }
+  .reading .mermaid { background:#fff; text-align:center; margin:14px 0; white-space:pre-wrap; font-size:12.5px; color:var(--muted); }
+  .reading .mermaid svg { margin:0 auto; }
+  .reading .mermaid.failed { border:1px dashed #cbd5e1; border-radius:10px; padding:14px; position:relative; }
+  .reading .mermaid.failed::before { content:"⚠ 方法图渲染失败（图库未加载完），刷新重试"; display:block; color:#b45309; font-size:12px; margin-bottom:6px; }
   .reading table { border-collapse:collapse; margin:12px 0; font-size:13.5px; }
   .reading th, .reading td { border:1px solid var(--line); padding:6px 12px; text-align:left; }
   .reading th { background:#f8fafc; font-weight:600; }
@@ -115,11 +118,13 @@
       <div class="t"><a href="/paper/{{ r.paper_id }}">{{ r.title }}</a></div>
       <div class="m"><span class="pill score">{{ r.score }}</span>{{ r.published }} ｜ {{ r.authors[:3]|join(', ') }}{% if r.authors|length > 3 %} et al.{% endif %}</div>
     </div>
+    {% else %}
+    <div class="empty">相似论文检索暂不可用（向量化服务波动或未配置），不影响上方解读内容。</div>
     {% endfor %}
   </div>
 </main>
 
-<script src="/static/mermaid.min.js" defer></script>
+<script src="/static/mermaid.min.js" defer id="mermaid-lib"></script>
 <script>
   // 把第一个 h2（三十秒速览）到下一个 h2 之间的内容包进浅色卡片，形成"电梯卡"效果。
   window.addEventListener('DOMContentLoaded', function () {
@@ -139,10 +144,11 @@
   });
 </script>
 <script>
-  // mermaid v9 渲染：把 markdown 的 <pre><code class="language-mermaid"> 转成图。
-  window.addEventListener('DOMContentLoaded', function () {
+  // mermaid 渲染三重保障（旧版根因：2.8MB 库慢网络下加载超 3s 重试窗口，图永不渲染）：
+  // ① pre→div 转换立即做（不依赖库）；② 库 onload 事件驱动 init（主路径）；
+  // ③ 轮询兜底 40×300ms=12s（防 onload 在缓存命中时不触发）；④ 全失败给可见提示。
+  (function () {
     var blocks = document.querySelectorAll('pre code.language-mermaid, pre > code[class*="mermaid"]');
-    if (!blocks.length) return;
     var divs = [];
     blocks.forEach(function (code) {
       var div = document.createElement('div');
@@ -151,16 +157,33 @@
       code.closest('pre').replaceWith(div);
       divs.push(div);
     });
-    function tryInit(tries) {
-      if (typeof mermaid !== 'undefined') {
+    if (!divs.length) return;
+    var done = false;
+    function render() {
+      if (done) return;
+      try {
         mermaid.initialize({ startOnLoad: false, theme: 'neutral', flowchart: { curve: 'basis' } });
-        try { mermaid.init(undefined, divs); } catch (e) { console.warn('mermaid init:', e); }
-      } else if (tries > 0) {
-        setTimeout(function () { tryInit(tries - 1); }, 300);  // 等 defer 脚本就绪
+        mermaid.init(undefined, divs);
+        done = !!divs[0].querySelector('svg');
+      } catch (e) {
+        console.warn('mermaid init:', e);
+        divs.forEach(function (d) { if (!d.querySelector('svg')) d.classList.add('failed'); });
       }
     }
-    tryInit(10);
-  });
+    var lib = document.getElementById('mermaid-lib');
+    if (lib) lib.addEventListener('load', function () {
+      if (typeof mermaid !== 'undefined') render();
+    });
+    var tries = 0;
+    (function poll() {
+      if (typeof mermaid !== 'undefined') { render(); return; }
+      if (++tries > 40) {  // 12 秒兜底窗口后放弃并提示
+        divs.forEach(function (d) { d.classList.add('failed'); });
+        return;
+      }
+      setTimeout(poll, 300);
+    })();
+  })();
 </script>
 {% else %}
 <div class="empty">论文不存在（paper_id 无效或数据未抓取）。<a href="/">返回首页</a></div>

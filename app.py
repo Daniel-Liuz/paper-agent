@@ -13,6 +13,7 @@ from pathlib import Path
 import faiss
 import markdown
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -22,6 +23,8 @@ from embedder import get_embedder
 import reading
 
 app = FastAPI(title="paper-agent")
+# 静态资源带 gzip：mermaid.min.js 2.8MB → 约 700KB，慢网络下不再错过渲染窗口
+app.add_middleware(GZipMiddleware, minimum_size=1024)
 templates = Jinja2Templates(directory="templates")
 app.mount("/static", StaticFiles(directory="static"), name="static")  # mermaid.js 等本地静态资源
 

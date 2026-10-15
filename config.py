@@ -12,6 +12,13 @@ OUT_DIR.mkdir(exist_ok=True)
 ARXIV_CATEGORIES = ["cs.AI", "cs.CL", "cs.CR", "cs.LG"]  # AI/NLP/安全/学习理论
 DEFAULT_MAX_RESULTS = 100
 
+# ---------- 研究方向画像（换领域只改这一段） ----------
+# 日报打分、深度解读的"与我的方向关联"、抓取默认查询都从这里读。
+# 例：换 CV 方向 → PROFILE_NAME="计算机视觉与多模态"、INTEREST_KEYWORDS/PAPER_TAGS 相应替换。
+PROFILE_NAME = "大模型 Agent 评测与安全"           # 深度解读第 5 节的方向名
+PROFILE_INTEREST = "大模型 Agent、Agent 评测、Agent 安全"  # 日报打分 system prompt 的兴趣描述
+FETCH_QUERY = "large language model agent"        # OpenAlex 抓取默认查询
+
 # 兴趣关键词：日报相关性初筛 + 后续评测用
 INTEREST_KEYWORDS = [
     "agent", "large language model", "LLM", "prompt injection",
