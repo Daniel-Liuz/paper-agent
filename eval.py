@@ -72,8 +72,18 @@ def judge_one(original: str, generated: str) -> dict:
         LLM_BASE_URL.rstrip("/") + "/chat/completions", data=body, method="POST",
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {LLM_API_KEY}"})
     started = time.perf_counter()
-    with urllib.request.urlopen(req, timeout=90) as resp:
-        data = json.loads(resp.read())
+    data = None
+    for attempt in range(3):  # 网络抖动/上游过载：退避重试，单次抖动不打穿整轮评测
+        try:
+            with urllib.request.urlopen(req, timeout=90) as resp:
+                data = json.loads(resp.read())
+            break
+        except Exception as err:
+            if attempt == 2:
+                raise
+            wait = 3 * (attempt + 1)
+            print(f"  [judge] {type(err).__name__}，退避 {wait}s 重试（{attempt + 1}/2）")
+            time.sleep(wait)
     latency_ms = round((time.perf_counter() - started) * 1000)
     parsed = json.loads(data["choices"][0]["message"]["content"])
     return {"faithfulness": max(1, min(5, int(parsed.get("faithfulness", 1)))),
@@ -115,7 +125,11 @@ def main() -> None:
             original = abstracts.get(it["paper_id"], "")
             if not original:
                 continue
-            result = judge_one(original, it["summary"])
+            try:
+                result = judge_one(original, it["summary"])
+            except Exception as err:  # 单篇失败只跳过，评测继续（评测必须比被测系统更稳）
+                print(f"  [skip] {it['title'][:44]}：{type(err).__name__}")
+                continue
             scores.append(result["faithfulness"])
             lats.append(result["latency_ms"])
             if result["faithfulness"] <= 3 and result["unsupported"]:
