@@ -82,3 +82,9 @@ export LLM_API_KEY="你的key"   # 智谱开放平台；或改 LLM_BASE_URL 指�
 - BGE-M3 首次运行会从 HF 下载模型（~2GB）；若 HF 慢：`export HF_ENDPOINT=https://hf-mirror.com`。
 - 分工约定：**ingest / digest / eval 设计 / 安全实验由你亲手写**（fetch 是示例模式），AI 负责 review、debug、架构讨论——面试要能守住每一行。
 - 里程碑：M0 今天 → M1 抓取今晚 → M2 入库明晚 → M3 日报 10/12 → M4 评测层下周 → M5 安全层下下周 → 推 GitHub（走 ghproxy）上简历。
+
+
+## v1.6: verify-retry loop + MCP server (2026-10)
+
+- **事实核验循环**: deep-reading output is verified on generation — every evidence anchor (blockquote quote) is matched verbatim against the source text (whitespace-collapsed, PDF hyphenation tolerant); failures trigger one feedback retry. Result shown as a badge on the reading page.
+- **MCP server** (): search / digest / reading exposed as MCP tools (stdio). Try: . Independent process — zero impact on the web app.
