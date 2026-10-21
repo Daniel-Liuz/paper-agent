@@ -196,12 +196,14 @@ def paper_detail(request: Request, paper_id: str):
     figures = reading.extract_figures(paper) if fulltext else []  # 摘要模式无 PDF 可抽
     citations = reading.citing_papers(paper_id)
     html = reading.get_reading(paper, related, fulltext=fulltext, citations=citations)
+    verify_meta = reading.load_verify_meta(paper_id)  # 锚点核验结果（v1.6 徽章用）
     return templates.TemplateResponse(request, "detail.html",
                                       {"paper": paper, "html": html, "related": related,
                                        "citations": citations,
                                        "has_fulltext": bool(fulltext),
                                        "truncated": bool(fulltext) and len(fulltext) >= 11900,
-                                       "figures": figures})
+                                       "figures": figures,
+                                       "verify_meta": verify_meta})
 
 
 @app.get("/figure/{paper_id}/{name}")

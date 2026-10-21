@@ -77,7 +77,16 @@
 </div>
 <main>
   <div class="card">
-    <div class="sec-title">深度解读 · agentic RAG（全文/摘要 + 相关工作 + 引用网络 → 结构化生成）</div>
+    <div class="sec-title">深度解读 · agentic RAG + 事实核验循环（生成 → 锚点比对原文 → 反馈重试）</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;">
+      {% if verify_meta and verify_meta.anchors %}
+        <span class="pill" style="background:{% if verify_meta.passed == verify_meta.anchors %}#ecfdf5;color:#059669{% else %}#fffbeb;color:#b45309{% endif %};font-weight:600;">
+          {% if verify_meta.passed == verify_meta.anchors %}✓ 事实锚点核验 {{ verify_meta.passed }}/{{ verify_meta.anchors }} 通过{% else %}锚点核验 {{ verify_meta.passed }}/{{ verify_meta.anchors }} 通过{% endif %}
+        </span>
+        {% if verify_meta.retried %}<span class="pill">经 1 次反馈重试</span>{% endif %}
+        <span style="color:var(--faint);font-size:11.5px;">每条「原文」引用自动与论文原文逐字比对</span>
+      {% endif %}
+    </div>
     {% if truncated %}
     <div class="trunc-note">解读基于 PDF 前 20 页（正文截断至约 1.2 万字符），超长论文的实验与附录部分可能未覆盖</div>
     {% endif %}

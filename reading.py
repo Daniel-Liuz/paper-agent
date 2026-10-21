@@ -201,9 +201,48 @@ def _llm(system: str, user: str, max_tokens: int = 1600, retries: int = 2) -> st
             raise
 
 
+def load_verify_meta(paper_id: str) -> dict | None:
+    """读取 {pid}.meta.json（锚点核验元数据）。旧缓存无 meta 返回 None——前端自然降级不显示徽章。"""
+    from config import OUT_DIR
+    path = OUT_DIR / "readings" / f"{paper_id}.meta.json"
+    if path.exists():
+        try:
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+    return None
+
+
+def _norm_for_match(s: str) -> str:
+    """比对归一化：折叠空白、去连字符断词（PDF 断行 'target-\ninterval'）、统一小写。"""
+    import re
+    s = re.sub(r"-\s+", "", s)   # PDF 断行连字符还原为连写词
+    s = re.sub(r"\s+", " ", s)   # 折叠所有空白（含断行）
+    return s.strip().lower()
+
+
+def verify_reading(text: str, fulltext: str | None, abstract: str) -> dict:
+    """事实锚点核验：解读中「> 原文：…」的英文引句必须逐字存在于原文/摘要。
+
+    返回 {"anchors": 总数, "passed": 通过数, "failed": [未匹配引句...]}。
+    这是 harness 里 verify 环节的最小实现——生成不是终点，可核验才算完成。
+    """
+    import re
+    quotes = re.findall(r"^>\s*原文[：:]\s*(.+)$", text, flags=re.M)
+    if not quotes:
+        return {"anchors": 0, "passed": 0, "failed": []}
+    source = _norm_for_match((fulltext or "") + "\n" + abstract)
+    failed = [q for q in quotes if _norm_for_match(q) not in source]
+    return {"anchors": len(quotes), "passed": len(quotes) - len(failed), "failed": failed}
+
+
 def get_reading(paper: dict, related: list[dict], fulltext: str | None = None,
                 citations: list[dict] | None = None) -> str:
-    """返回解读 HTML（缓存幂等）。fulltext 有值走全文精读，否则摘要模式。"""
+    """返回解读 HTML（缓存幂等）。fulltext 有值走全文精读，否则摘要模式。
+
+    v1.6：生成后走 verify-retry 循环——锚点核验不过则带失败清单反馈重试一次，
+    结果元数据写 {pid}.meta.json（前端徽章用）。gather→generate→verify→retry。
+    """
     from config import OUT_DIR
     global READINGS_DIR
     READINGS_DIR = OUT_DIR / "readings"
@@ -230,8 +269,25 @@ def get_reading(paper: dict, related: list[dict], fulltext: str | None = None,
     )
     started = time.perf_counter()
     text = _llm(READING_SYSTEM, user_prompt)
+    report = verify_reading(text, fulltext, paper.get("abstract", ""))
+    retried = 0
+    if report["failed"]:  # verify 不过 → 带失败清单反馈重试一次（循环的 retry 步）
+        retried = 1
+        print(f"[verify] {report['passed']}/{report['anchors']} 锚点通过，带反馈重试："
+              f"{[q[:40] for q in report['failed']]}")
+        feedback = "\n\n【核验反馈】以下「原文」引用未能在论文原文中逐字找到，请修正为逐字摘录"
+        "（保留原数字与措辞，最多两句；引用确实不存在就删掉该条引用）：\n" + \
+            "\n".join(f"- {q}" for q in report["failed"])
+        text = _llm(READING_SYSTEM, user_prompt + feedback)
+        report = verify_reading(text, fulltext, paper.get("abstract", ""))
+
     html = markdown.markdown(text, extensions=["tables", "fenced_code"])
     cache.write_text(html, encoding="utf-8")
+    (READINGS_DIR / f'{paper["paper_id"]}.meta.json').write_text(json.dumps({
+        "anchors": report["anchors"], "passed": report["passed"],
+        "retried": retried, "mode": "fulltext" if fulltext else "abstract",
+    }, ensure_ascii=False), encoding="utf-8")
     print(f'深度解读 v2 已生成：{paper["title"][:50]} '
-          f'（{"全文" if fulltext else "摘要"}模式，{time.perf_counter() - started:.1f}s）')
+          f'（{"全文" if fulltext else "摘要"}模式，锚点核验 {report["passed"]}/{report["anchors"]}'
+          f'{"（重试后）" if retried else ""}，{time.perf_counter() - started:.1f}s）')
     return html

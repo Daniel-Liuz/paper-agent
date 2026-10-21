@@ -10,7 +10,7 @@ apt-get update -qq
 apt-get install -y -qq python3-venv rsync >/dev/null
 python3 -m venv .venv
 .venv/bin/pip install -q -i https://pypi.tuna.tsinghua.edu.cn/simple \
-  fastapi uvicorn jinja2 markdown faiss-cpu numpy requests pymupdf
+  fastapi uvicorn jinja2 markdown faiss-cpu numpy requests pymupdf mcp
 
 echo "== .env 服务器侧配置 =="
 touch .env
