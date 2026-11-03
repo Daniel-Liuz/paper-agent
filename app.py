@@ -216,3 +216,31 @@ def figure(paper_id: str, name: str):
     if not path.exists():
         raise HTTPException(status_code=404)
     return FileResponse(path, media_type="image/png")
+
+
+# ---------- SafePaperAgent：可审计的多步科研任务（P0 Runtime 接入，不动既有接口） ----------
+@app.get("/agent/tasks")
+def agent_tasks():
+    from agent.state import AgentState
+    return AgentState().list_tasks()
+
+
+@app.post("/agent/run")
+def agent_run(body: dict):
+    """同步执行一个研究任务（真实 LLM，30-120s）。body: {"query": "...", "max_steps": 8}。
+    轨迹与状态落 SQLite（outputs/agent_state.db），可用 /agent/tasks 查询。"""
+    import asyncio
+    from agent.llm import RealLLM
+    from agent.policy import PolicyEngine
+    from agent.runtime import AgentRuntime, Budget
+    from agent.state import AgentState
+    query = str(body.get("query") or "").strip()
+    if not query:
+        raise HTTPException(status_code=400, detail="query 不能为空")
+    runtime = AgentRuntime(
+        llm=RealLLM(), state=AgentState(), policy=PolicyEngine(),
+        budget=Budget(max_steps=int(body.get("max_steps", 8))))
+    result = runtime.run(query)
+    return {"task_id": result.task_id, "status": result.status,
+            "steps": result.steps, "tokens": result.tokens,
+            "error": result.error, "report": result.report[:4000]}

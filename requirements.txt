@@ -7,3 +7,5 @@ jinja2
 markdown
 numpy
 pymupdf
+mcp
+pytest

@@ -1,0 +1,16 @@
+{"task_id": "T01", "type": "retrieval", "query": "找出 3 篇关于 LLM agent 安全与运行时监控的论文", "expect": {"hit_any": ["W4416551460", "W7150731460", "W7125946859"], "min_papers": 2, "expect_status": "finished"}}
+{"task_id": "T02", "type": "retrieval", "query": "检索多智能体金融分析相关的论文", "expect": {"hit_any": ["W7220916758", "W7221064192"], "min_papers": 2, "expect_status": "finished"}}
+{"task_id": "T03", "type": "retrieval", "query": "找关于网页自动化 Agent 的多步工作流论文", "expect": {"hit_any": ["W7220892291", "W7220921908"], "min_papers": 1, "expect_status": "finished"}}
+{"task_id": "T04", "type": "retrieval", "query": "找评估 LLM Agent 能力或审计其表现的论文", "expect": {"hit_any": ["W7221039646", "W7220901878"], "min_papers": 1, "expect_status": "finished"}}
+{"task_id": "T05", "type": "retrieval", "query": "检索代码理解与代码评审 Agent 的论文", "expect": {"hit_any": ["W7164821586", "W7125946859", "W7220926072"], "min_papers": 1, "expect_status": "finished"}}
+{"task_id": "T06", "type": "compare", "query": "比较 3 篇多智能体框架论文在任务分工上的不同做法", "expect": {"distinct_papers": 3, "require_verified_quotes": true, "expect_status": "finished"}}
+{"task_id": "T07", "type": "compare", "query": "对比两篇 agent 安全论文的防御思路差异", "expect": {"distinct_papers": 2, "require_verified_quotes": true, "expect_status": "finished"}}
+{"task_id": "T08", "type": "compare", "query": "比较护栏设计（W7164329679）与 CFD 综述（W7221100712）两类 agent 架构论文的研究方法", "expect": {"hit_any": ["W7164329679", "W7221100712"], "distinct_papers": 2, "expect_status": "finished"}}
+{"task_id": "T09", "type": "verify", "query": "核验引文：论文 W7164329679 中是否出现 'achieves a target-interval compliance rate of 98.3%'，并给出结论", "expect": {"expect_status": "finished", "verify_expect": {"paper_id": "W7164329679", "quote_contains": "target-interval compliance rate", "found": true}}}
+{"task_id": "T10", "type": "verify", "query": "核验引文：论文 W7164329679 中是否出现 'achieves a compliance rate of 99.9%'，并给出结论", "expect": {"expect_status": "finished", "verify_expect": {"paper_id": "W7164329679", "quote_contains": "99.9", "found": false}}}
+{"task_id": "T11", "type": "verify", "query": "检索 ProbGuard 论文并核验其摘要中关于 proactive runtime monitoring 的原句，报告结论", "expect": {"hit_any": ["W4416551460"], "require_verified_quotes": true, "expect_status": "finished"}}
+{"task_id": "T12", "type": "verify", "query": "检索一篇凭证泄露研究论文，摘录并核验一句关键结论", "expect": {"hit_any": ["W7150731460"], "require_verified_quotes": true, "expect_status": "finished"}}
+{"task_id": "T13", "type": "resilience", "query": "阅读论文 W9999999999 并总结（该 id 不存在；应报告不可得并改用检索完成替代调研）", "expect": {"expect_status": ["finished", "failed"], "graceful_on_error": true, "no_infinite_retry": true}}
+{"task_id": "T14", "type": "resilience", "query": "用检索工具查 'zzz不存在的主题qqq'（应为空结果；agent 应换表述重试或明确报告无结果）", "expect": {"expect_status": ["finished", "failed"], "graceful_on_error": true, "no_infinite_retry": true}}
+{"task_id": "T15", "type": "resilience", "query": "先读 W7164329679 的全文，若不可用则退回摘要，总结其闭环框架", "expect": {"hit_any": ["W7164329679"], "expect_status": "finished"}}
+{"task_id": "T16", "type": "compare", "query": "围绕 agent 可靠性主题检索 3 篇论文，比较它们对失败恢复的处理，引用核验后的原句", "expect": {"distinct_papers": 3, "require_verified_quotes": true, "expect_status": "finished"}}
