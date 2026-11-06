@@ -68,13 +68,15 @@ t3a8f…  finished  找出 prompt injection 防御的 3 篇论文…
 
 预算约束默认：≤8 步、≤60k tokens、连续 3 次工具失败即终止（`budget_exceeded`/`failed` 均为显式终态）。失败恢复=同 task 重跑（工具层缓存幂等，取舍说明见 docs/architecture_audit.md）。
 
-## 安全边界（agent/policy.py）
+## 安全边界（agent/policy.py + agent/output_guard.py）
 
-**硬边界（代码层，可被单元测试证明）**：工具白名单（4 个只读工具之外任何调用——无论 LLM 出于什么理由/被什么注入操纵——一律 `policy_denied`）；参数 schema 校验（类型/必填/长度/k 范围）；高危工具默认拒绝且本项目不提供任何删除/外发/命令执行工具。
+**执行层硬边界（代码层，pytest 可证明）**：工具白名单（白名单外任何调用——无论 LLM 被什么注入操纵——一律 `policy_denied`）；参数 schema 校验；高危工具默认拒绝且本项目不提供任何删除/外发/命令执行工具。真实实验：60 个攻击任务中违规工具调用 **0 次**。
 
-**概率缓解（提示层，不构成保证）**：`<untrusted_document>` Spotlighting 隔离工具返回的不可信内容 + 安全系统提示。
+**输出侧 guard（2026-11-06 新增，代码层）**：报告提交时校验——URL 必须落在可信学术域白名单（arXiv/OpenAlex/DOI 等，测试证明合法链接零误拦）；引用的 paper_id 必须有任务轨迹支撑（真实运行中抓到 1 例模型编造引用）。真实对照实验：完成条件下输出污染 **88%（无防御）→ 30%（guarded）**，URL 形态外传 100% 拦截；残留 30% 为非 URL 文本标记形态（如实报告，见 docs/evaluation_report.md §2.2）。
 
-**如实声明的残留面**：执行层管得住"工具调用"，管不住"模型把 canary 文本写进最终报告"——输出侧过滤是下一步（真实数据见 docs/evaluation_report.md 的 end_to_end_asr）。
+**概率缓解（提示层，不构成保证）**：`<untrusted_document>` Spotlighting 隔离 + 安全系统提示。
+
+**可靠性**：LLM 请求 420s / 工具执行 120s daemon 线程看门狗（防连接挂起拖死任务）；单轮多工具调用逐调用检查步数预算；全部行为有 pytest 回归。
 
 ## 评测（eval_harness）
 

@@ -40,6 +40,31 @@ class Budget:
     max_tokens: int = 60_000
     max_consecutive_failures: int = 3
     per_call_timeout_s: int = 150
+    per_tool_timeout_s: int = 120     # 单工具执行硬上限（线程看门狗，含 PDF 下载）
+
+
+def _run_with_timeout(fn, args: tuple, timeout_s: int, label: str):
+    """daemon 线程看门狗：urllib 的 timeout 参数对'连接建立后挂起'无效（2026-10-27
+    评测实测卡死根因）。daemon 线程保证放弃后不阻塞进程退出（ThreadPoolExecutor
+    的 with 退出会 join 挂起线程，实测仍拖死——故不用）。超时抛 ToolError 回填。"""
+    import threading
+    box: dict = {}
+
+    def _runner():
+        try:
+            box["result"] = fn(*args)
+        except BaseException as err:            # noqa: BLE001 透传原异常
+            box["error"] = err
+
+    t = threading.Thread(target=_runner, daemon=True)
+    t.start()
+    t.join(timeout_s)
+    if t.is_alive():
+        raise agent_tools.ToolError(
+            f"{label} 执行超过 {timeout_s}s 硬上限，已放弃（后台线程随进程退出）")
+    if "error" in box:
+        raise box["error"]
+    return box["result"]
 
 
 @dataclass
@@ -56,11 +81,15 @@ class AgentResult:
 class AgentRuntime:
     def __init__(self, llm: BaseLLM, state: Optional[AgentState] = None,
                  policy: Optional[PolicyEngine] = None,
-                 budget: Optional[Budget] = None):
+                 budget: Optional[Budget] = None,
+                 output_guard=None):
+        """output_guard: 可选 OutputGuard（block 模式在 finish 时过滤报告外链/
+        标记无轨迹支撑的 paper_id）。None=不启用（baseline/hardened 对照用）。"""
         self.llm = llm
         self.state = state
         self.policy = policy or PolicyEngine()
         self.budget = budget or Budget()
+        self.output_guard = output_guard
 
     def run(self, query: str, task_id: Optional[str] = None,
             extra_user_context: str = "") -> AgentResult:
@@ -84,6 +113,7 @@ class AgentRuntime:
         consecutive_failures = 0
         step = 0
         status, report, error = "finished", "", ""
+        touched_ids: set[str] = set()     # 任务全程真实接触过的 paper_id（guard 用）
 
         while True:
             # ---- 预算检查（先于任何新调用）----
@@ -109,6 +139,10 @@ class AgentRuntime:
                 else:
                     status, error = "failed", "模型返回空响应且无工具调用"
                 break
+            # 本轮轨迹中真实接触过的论文 id（finish 后供 output_guard 校验引用落地）
+            touched_ids |= {str(c.arguments.get("paper_id"))
+                            for c in resp.tool_calls
+                            if c.arguments.get("paper_id")}
 
             # ---- 逐个处理本轮工具调用（每步都查预算：单轮多调用也可能耗尽步数）----
             finished_this_turn = False
@@ -135,7 +169,18 @@ class AgentRuntime:
                     consecutive_failures += 1
                 else:
                     try:
-                        result = agent_tools.execute(call.name, call.arguments)
+                        result = _run_with_timeout(
+                            agent_tools.execute,
+                            (call.name, call.arguments),
+                            self.budget.per_tool_timeout_s, call.name)
+                        # 引用落地证据：工具参数与检索结果里出现过的 paper_id 都算
+                        # "真实接触"（报告引用它们=有轨迹支撑，防编造引用的判定源）
+                        if isinstance(result, dict):
+                            for hit in result.get("results", []) or []:
+                                if hit.get("paper_id"):
+                                    touched_ids.add(str(hit["paper_id"]))
+                            if result.get("paper_id"):
+                                touched_ids.add(str(result["paper_id"]))
                         obs = self.policy.wrap_untrusted(result, call.name)
                         entry.update(decision="allowed", status="ok",
                                      latency_ms=int((time.perf_counter() - step_started) * 1000))
@@ -146,6 +191,14 @@ class AgentRuntime:
                         consecutive_failures = 0
                         if call.name in agent_tools.TERMINAL_TOOLS:
                             report = str(call.arguments.get("report", ""))
+                            if self.output_guard is not None:
+                                verdict = self.output_guard.check(
+                                    report, trajectory_paper_ids=touched_ids,
+                                    task_id=task_id)
+                                report = self.output_guard.sanitize(report, verdict)
+                                entry["_guard_action"] = verdict.action
+                                entry["_guard_blocked"] = len(verdict.blocked_urls)
+                                entry["_guard_unbacked"] = len(verdict.unbacked_paper_ids)
                             finished_this_turn = True
                     except agent_tools.ToolError as err:
                         obs = json.dumps({"error": "tool_failed",

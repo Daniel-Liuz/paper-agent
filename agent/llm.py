@@ -40,24 +40,27 @@ class BaseLLM(Protocol):
 
 
 class RealLLM:
-    """DeepSeek（OpenAI 兼容）function calling。带 429/5xx 退避重试。"""
+    """DeepSeek（OpenAI 兼容）function calling。带 429/5xx 退避重试 + 线程看门狗硬帽。
+
+    看门狗动机：urllib 的 timeout 参数对"连接建立后挂起"无效（2026-10-27 评测中
+    单任务挂死 >10min 的根因），因此整个请求循环放在可放弃的线程里，超过
+    hard_timeout_s 直接抛 TimeoutError，由 Runtime 决定任务终态。
+    """
+
+    hard_timeout_s: int = 420        # 单次 chat 总硬帽（含全部重试与退避）
 
     def __init__(self, model: str = LLM_MODEL, retries: int = 2):
         self.model = model
         self.retries = retries
 
-    def chat(self, messages: list[dict], tools: Optional[list[dict]] = None,
-             temperature: float = 0.2) -> LLMResponse:
+    def _chat_blocking(self, messages, tools, temperature) -> dict:
         body: dict[str, Any] = {
-            "model": self.model,
-            "messages": messages,
-            "temperature": temperature,
-            "max_tokens": 2000,
+            "model": self.model, "messages": messages,
+            "temperature": temperature, "max_tokens": 2000,
         }
         if tools:
             body["tools"] = tools
         payload = json.dumps(body).encode("utf-8")
-        started = time.perf_counter()
         data = None
         for attempt in range(self.retries + 1):
             if attempt:
@@ -76,6 +79,29 @@ class RealLLM:
                     continue
                 raise
         assert data is not None
+        return data
+
+    def chat(self, messages: list[dict], tools: Optional[list[dict]] = None,
+             temperature: float = 0.2) -> LLMResponse:
+        import threading
+        box: dict = {}
+
+        def _runner():
+            try:
+                box["result"] = self._chat_blocking(messages, tools, temperature)
+            except BaseException as err:          # noqa: BLE001
+                box["error"] = err
+
+        started = time.perf_counter()
+        t = threading.Thread(target=_runner, daemon=True)
+        t.start()
+        t.join(self.hard_timeout_s)
+        if t.is_alive():
+            raise TimeoutError(
+                f"LLM 请求超过 {self.hard_timeout_s}s 硬帽（含重试），已放弃")
+        if "error" in box:
+            raise box["error"]
+        data = box["result"]
         msg = data["choices"][0]["message"]
         usage = data.get("usage", {})
         calls: list[ToolCall] = []

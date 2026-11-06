@@ -4,7 +4,7 @@
 # 密钥与 known_hosts 都放本目录（绕开 ~/.ssh 属主问题）。
 set -e
 SRV="${1:-root@121.43.155.169}"
-KEY=/home/daniel/paper-agent/deploy/ecs_key
+KEY=/home/daniel/paper-agent/deploy/ecs_key2
 KH=/home/daniel/paper-agent/deploy/known_hosts
 SSHOPTS="-i $KEY -o UserKnownHostsFile=$KH -o StrictHostKeyChecking=accept-new"
 cd /home/daniel/paper-agent

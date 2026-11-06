@@ -5,3 +5,7 @@ data/
 outputs/
 *.index
 *.pkl
+
+# 部署密钥绝不进 git（2026-11-06 修复：旧 key 曾泄漏至公开历史，已轮换）
+deploy/ecs_key*
+deploy/known_hosts
